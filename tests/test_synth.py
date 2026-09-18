@@ -15,7 +15,16 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from svclab.synth import CENTRE, INTENTS, Dataset, contacts, generate_dataset, intent_truth
+from svclab.synth import (
+    CENTRE,
+    GRADERS,
+    INTENTS,
+    QUALITY,
+    Dataset,
+    contacts,
+    generate_dataset,
+    intent_truth,
+)
 
 SOURCE = Path(__file__).resolve().parents[1] / "src" / "svclab"
 
@@ -95,6 +104,35 @@ class TestTheTruthColumns:
             subset = full.contacts[full.contacts["intent"] == row["intent"]]
             assert row["contacts"] == len(subset)
             assert row["mean_difficulty"] == pytest.approx(subset["difficulty"].mean())
+
+
+class TestTheQualitySample:
+    def test_the_panel_samples_the_declared_number_of_sessions(self, full: Dataset) -> None:
+        expected = QUALITY.sample * len(GRADERS) * QUALITY.replicates
+        assert len(full.panel_noise) == expected
+        assert full.panel_noise["contact"].nunique() == QUALITY.sample
+        assert set(full.panel_noise["grader"]) == {profile.grader for profile in GRADERS}
+        assert set(full.panel_noise["replicate"]) == set(range(1, QUALITY.replicates + 1))
+
+    def test_the_judge_reads_every_contact(self, full: Dataset) -> None:
+        assert len(full.judge_noise) == CENTRE.contacts
+        assert full.judge_noise["contact"].is_unique
+
+    def test_each_graders_noise_has_the_spread_it_declared(self, full: Dataset) -> None:
+        """A declared standard deviation that the draws do not have is a parameter nobody can read."""
+        measured = full.panel_noise.groupby("grader")["noise"].std()
+        for profile in GRADERS:
+            assert float(measured[profile.grader]) == pytest.approx(profile.noise_sd, rel=0.06)
+
+    def test_a_sample_larger_than_the_centre_is_refused(self, full: Dataset) -> None:
+        from dataclasses import replace
+
+        from svclab.synth import quality_noise
+
+        with pytest.raises(ValueError, match="cannot sample"):
+            quality_noise(
+                np.random.default_rng(0), CENTRE, replace(QUALITY, sample=CENTRE.contacts + 1)
+            )
 
 
 class TestReproducibility:

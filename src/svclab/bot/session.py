@@ -48,6 +48,14 @@ OUTCOMES = ("resolved-by-bot", "escalated", "abandoned", "straight-to-human", "r
 #: repository an underestimate of what an automation costs the queue.
 MAX_REPEATS = 1
 
+#: What a repeat session's id is offset from its contact's id by. A constant rather than "one past
+#: the largest contact in this call", which is what the first version used: that made ids unique
+#: only *within* one call, so pooling the treated and control arms - which is exactly what a quality
+#: study does - produced two different sessions sharing an id. Derived from the contact id instead,
+#: so a session id is unique across any set of runs over disjoint contacts and stable whatever
+#: subset is passed in.
+REPEAT_SESSION_OFFSET = 1_000_000
+
 #: Turns a bot needs to resolve a contact it can resolve, at difficulty zero and at difficulty one.
 #: Not a policy parameter: it is a property of the conversation, and it is why a longer turn budget
 #: buys anything at all.
@@ -197,13 +205,18 @@ def run(
     if not returns.any():
         return first[list(OUTCOME_COLUMNS)]
 
-    # The repeat stream, as rows. Session ids continue past the contact ids so that one column
-    # identifies a session, while `contact` keeps a repeat joinable to what caused it.
+    # The repeat stream, as rows. A repeat's session id is its contact's id plus a fixed offset, so
+    # one column identifies a session across any set of runs while `contact` keeps the repeat
+    # joinable to what caused it.
     back = contacts[returns]
-    offset = int(contacts["contact"].max()) + 1
+    if int(contacts["contact"].max()) >= REPEAT_SESSION_OFFSET:
+        raise ValueError(
+            f"contact ids reach {int(contacts['contact'].max())}, which collides with the repeat "
+            f"session offset of {REPEAT_SESSION_OFFSET}"
+        )
     again = pd.DataFrame(
         {
-            "session": np.arange(offset, offset + len(back), dtype=int),
+            "session": back["contact"].to_numpy(dtype=int) + REPEAT_SESSION_OFFSET,
             "contact": back["contact"].to_numpy(),
             "customer": back["customer"].to_numpy(),
             "intent": back["intent"].to_numpy(),

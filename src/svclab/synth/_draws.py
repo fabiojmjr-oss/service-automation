@@ -29,6 +29,15 @@ def uniform(rng: np.random.Generator, size: int | tuple[int, ...]) -> np.ndarray
     return rng.random(size)
 
 
+def normal(rng: np.random.Generator, size: int | tuple[int, ...], sd: float = 1.0) -> np.ndarray:
+    """Normal draws by inverse transform, in place of ``Generator.normal``.
+
+    ``Generator.standard_normal`` is the ziggurat algorithm, which rejects, so it belongs to the
+    same class of hazard as the binomial this rule was written for.
+    """
+    return np.asarray(stats.norm.ppf(uniform(rng, size)) * sd, dtype=float)
+
+
 def beta(rng: np.random.Generator, size: int, alpha: float, beta_shape: float) -> np.ndarray:
     """Beta draws by inverse transform, in place of ``Generator.beta``."""
     return np.asarray(stats.beta.ppf(uniform(rng, size), alpha, beta_shape), dtype=float)

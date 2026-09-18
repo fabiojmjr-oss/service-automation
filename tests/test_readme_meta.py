@@ -196,7 +196,16 @@ def test_the_recorded_defect_count_matches_the_roadmap() -> None:
     assert recorded > 0
     english = (ROOT / "README.md").read_text(encoding="utf-8")
     portuguese = (ROOT / "README.pt-BR.md").read_text(encoding="utf-8")
-    words = {5: ("Five", "Cinco"), 6: ("Six", "Seis"), 7: ("Seven", "Sete")}
+    words = {
+        5: ("Five", "Cinco"),
+        6: ("Six", "Seis"),
+        7: ("Seven", "Sete"),
+        8: ("Eight", "Oito"),
+        9: ("Nine", "Nove"),
+        10: ("Ten", "Dez"),
+        11: ("Eleven", "Onze"),
+        12: ("Twelve", "Doze"),
+    }
     assert recorded in words, f"{recorded} defects recorded, and no word for it here"
     english_word, portuguese_word = words[recorded]
     assert f"{english_word} so far" in english, english_word

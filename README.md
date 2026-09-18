@@ -72,6 +72,38 @@ The other two are at least arguable from the model that was used. **1.49 agents 
 non-linearity** — Erlang on the same reduced volume at the same handling time, no behavioural
 assumption in it whatever.
 
+## And the meter you would replace it with was never qualified
+
+Wave 1's conclusion is to judge a policy on resolution rather than containment. An operation measures
+that by grading sessions — so the quality panel becomes the instrument, and **a panel is a gauge that
+gets qualified before it is used.** That is ordinary practice for a caliper and almost unheard of for a
+quality rubric.
+
+- **The panel does not agree with itself.** Reading the same session twice, each grader contradicts
+  their earlier verdict on **17% to 23%** of them. Between graders, raw agreement is 76% to 78% at a
+  kappa of **0.54 to 0.57** — and the pass rate reported on the identical sessions runs from **0.3815
+  to 0.5683** depending on who was on the rota. A factor of 1.49 on the headline number.
+- **And measurement error does not add noise to a comparison, it shrinks it — by a factor with a
+  closed form.** A binary assessor turns a true pass rate `p` into `p·se + (1−p)·(1−sp)`, so a
+  difference between two groups comes out multiplied by `se + sp − 1`: the Youden index, **towards
+  zero, always**. The true gap between the arms is 0.5459 acceptable sessions. This panel's index is
+  0.6945, so it reports **0.3791 — 69.45% of the real difference.** Exactly, not approximately.
+- **A gauge whose sensitivity and specificity sum to one reports exactly zero**, however large the
+  real difference. Below that it reverses the sign: not noisy, inverted, and the report says the
+  opposite with the same confidence.
+- **Attenuation is paid for in sample size.** Detecting this gap takes 10.07 sessions per arm with a
+  perfect gauge and **25.03** with this panel — an inflation of 2.49×, worse than the 2.07 the square
+  of the Youden index predicts, because the attenuated rates also sit closer to 0.5 where a
+  proportion's variance is largest. Sample size is the lever everybody pulls *before* checking whether
+  the instrument works.
+- **And the automated judge is more accurate than every individual grader, and would be validated
+  against them.** It agrees with the declared standard 0.8850 of the time against the best grader's
+  0.8675. Validated against one grader it scores anywhere from **0.5450 to 0.7121** of kappa — a
+  spread of 0.17 decided by whose week it was. "Agreement with our human reviewers" is a measurement
+  of the reviewers as much as of the judge. The honest counterweight, in the same breath: the panel as
+  a **committee** beats the judge, 0.7979 against 0.7826 — averaging three moderate assessors recovers
+  most of what each one loses, which is an argument for a panel and not for any member of it.
+
 ## Modules
 
 | Module | What it decides |
@@ -80,6 +112,7 @@ assumption in it whatever.
 | [`svclab.bot`](src/svclab/bot/README.md) | How long the bot should try, what it should refuse to attempt, and whether the difference between two policies is the policy — which needs the same contacts on both sides and a line between what a policy may see and what the world knows. |
 | [`svclab.containment`](src/svclab/containment/README.md) | Which containment number is being shown, out of the four that are all correct; how much of it reached the queue, against customers who never met the bot; and which contacts the bot kept. |
 | [`svclab.capacity`](src/svclab/capacity/README.md) | How many agents the queue needs at its service level, how many the containment rate promised, and where the difference came from. |
+| [`svclab.quality`](src/svclab/quality/README.md) | Whether the quality score is a measurement or a habit, how much of a real difference this panel will report, and what an unqualified gauge costs in sessions. |
 
 Every module README is bilingual and carries an **Assumptions and limitations** section, because a
 figure without its assumptions is not a result.
@@ -89,6 +122,7 @@ figure without its assumptions is not a result.
 | Example | What it shows |
 | --- | --- |
 | [`examples/01_the_containment_that_wasnt.py`](examples/01_the_containment_that_wasnt.py) | Four policies on one account: the four containment rates and the ranking each produces, which contacts the bot kept, what the queue actually received against what was claimed, and the headcount case decomposed into its three errors. |
+| [`examples/02_the_meter_that_was_noise.py`](examples/02_the_meter_that_was_noise.py) | The gauge study run before the comparison: repeatability, reproducibility, bias against a declared standard, the exact factor by which the panel shrinks every difference, what that costs in sessions, and what an automated judge would be validated against. |
 
 ## Install and run
 
@@ -97,12 +131,13 @@ python -m pip install -e ".[dev]"
 make check       # lint, types and the fast suite - what gates a push
 make check-all   # the above plus every documented figure re-derived
 python examples/01_the_containment_that_wasnt.py
+python examples/02_the_meter_that_was_noise.py
 ```
 
 ## How the claims are kept honest
 
-**107 tests, 100% statement and branch coverage.** 92 of them run in seconds and gate every push. The
-remaining 15 re-derive, from the generator, every figure quoted in every README on this repository,
+**152 tests, 100% statement and branch coverage.** 129 of them run in seconds and gate every push. The
+remaining 23 re-derive, from the generator, every figure quoted in every README on this repository,
 and run the example script. A change that moves a published number breaks the build instead of leaving
 the text quietly wrong.
 
@@ -127,11 +162,13 @@ position depends on how many values are asked for and not on which library versi
 is checked against the source, because a sibling repository published figures that held on one machine
 and moved on a clean install.
 
-**And defects are recorded rather than quietly fixed.** Five so far, in
-[`docs/ROADMAP.md`](docs/ROADMAP.md), all five found by connecting the modules, by a control case or by
-verifying a sentence. The first is the one worth reading: the original session charged a repeat contact
-as extra seconds rather than as a row, which makes deflection arithmetically identical to containment
-and hides the entire finding behind a tautology.
+**And defects are recorded rather than quietly fixed.** Nine so far, in
+[`docs/ROADMAP.md`](docs/ROADMAP.md), every one of them found by connecting the modules, by a control
+case or by verifying a sentence — none by reading code. Two are worth reading. The original session
+charged a repeat contact as extra seconds rather than as a row, which makes deflection arithmetically
+identical to containment and hides the entire finding behind a tautology. And a repeat's session id was
+unique only within one run, which nothing in wave 1 could expose because wave 1 never pooled two runs —
+wave 2 pooled the arms and the arrays stopped lining up.
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is built, what is deliberately absent — including why
 there is no language model here — and what is still open.

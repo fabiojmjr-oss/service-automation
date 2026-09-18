@@ -72,6 +72,38 @@ Os outros dois são pelo menos discutíveis a partir do modelo que foi usado. **
 diferença é não-linearidade pura** — Erlang sobre o mesmo volume reduzido com o mesmo tempo de
 atendimento, sem nenhuma premissa comportamental.
 
+## E o medidor com que você o substituiria nunca foi qualificado
+
+A conclusão da onda 1 é julgar uma política por resolução e não por contenção. Uma operação mede isso
+avaliando sessões — então o painel de qualidade se torna o instrumento, e **um painel é um instrumento
+de medição que se qualifica antes de usar.** Isso é prática comum para um paquímetro e praticamente
+inédito para uma régua de qualidade.
+
+- **O painel não concorda consigo mesmo.** Lendo a mesma sessão duas vezes, cada avaliador contradiz o
+  próprio veredito anterior em **17% a 23%** delas. Entre avaliadores, a concordância bruta é de 76% a
+  78% com kappa de **0,54 a 0,57** — e a taxa de aprovação reportada nas sessões idênticas vai de
+  **0,3815 a 0,5683** dependendo de quem estava na escala. Um fator de 1,49 no número principal.
+- **E erro de medição não adiciona ruído a uma comparação, ele a encolhe — por um fator com forma
+  fechada.** Um avaliador binário transforma uma taxa real `p` em `p·se + (1−p)·(1−sp)`, então uma
+  diferença entre dois grupos sai multiplicada por `se + sp − 1`: o índice de Youden, **em direção a
+  zero, sempre**. O gap real entre os braços é de 0,5459 sessões aceitáveis. O índice deste painel é
+  0,6945, então ele reporta **0,3791 — 69,45% da diferença real.** Exatamente, não aproximadamente.
+- **Um instrumento cuja sensibilidade mais especificidade soma um reporta exatamente zero**, por maior
+  que seja a diferença real. Abaixo disso ele inverte o sinal: não é ruidoso, é invertido, e o
+  relatório diz o oposto com a mesma confiança.
+- **Atenuação se paga em tamanho de amostra.** Detectar esse gap leva 10,07 sessões por braço com um
+  instrumento perfeito e **25,03** com este painel — inflação de 2,49×, pior que as 2,07 que o quadrado
+  do índice de Youden prevê, porque as taxas atenuadas também ficam mais perto de 0,5, onde a variância
+  de uma proporção é maior. Tamanho de amostra é a alavanca que todo mundo puxa *antes* de verificar se
+  o instrumento funciona.
+- **E o juiz automático é mais acurado que qualquer avaliador individual, e seria validado contra
+  eles.** Ele concorda com o padrão declarado 0,8850 das vezes contra os 0,8675 do melhor avaliador.
+  Validado contra um avaliador, ele tira de **0,5450 a 0,7121** de kappa — dispersão de 0,17 decidida
+  por qual semana era. "Concordância com nossos revisores humanos" é uma medição dos revisores tanto
+  quanto do juiz. O contrapeso honesto, na mesma frase: o painel como **comitê** ganha do juiz, 0,7979
+  contra 0,7826 — fazer a média de três avaliadores moderados recupera a maior parte do que cada um
+  perde, o que é argumento a favor de um painel e não de nenhum de seus membros.
+
 ## Módulos
 
 | Módulo | O que decide |
@@ -80,6 +112,7 @@ atendimento, sem nenhuma premissa comportamental.
 | [`svclab.bot`](src/svclab/bot/README.md) | Por quanto tempo o bot deve tentar, o que deve se recusar a tentar, e se a diferença entre duas políticas é a política — o que exige os mesmos contatos nos dois lados e uma linha entre o que uma política pode ver e o que o mundo sabe. |
 | [`svclab.containment`](src/svclab/containment/README.md) | Qual número de contenção está sendo mostrado, entre os quatro que estão todos corretos; quanto dele chegou à fila, contra clientes que nunca encontraram o bot; e quais contatos o bot ficou. |
 | [`svclab.capacity`](src/svclab/capacity/README.md) | Quantos atendentes a fila precisa no seu nível de serviço, quantos a taxa de contenção prometeu, e de onde veio a diferença. |
+| [`svclab.quality`](src/svclab/quality/README.md) | Se a nota de qualidade é uma medição ou um hábito, quanto de uma diferença real este painel vai reportar, e o que um instrumento não qualificado custa em sessões. |
 
 Todo README de módulo é bilíngue e traz uma seção **Premissas e limitações**, porque uma cifra sem suas
 premissas não é um resultado.
@@ -89,6 +122,7 @@ premissas não é um resultado.
 | Exemplo | O que mostra |
 | --- | --- |
 | [`examples/01_the_containment_that_wasnt.py`](examples/01_the_containment_that_wasnt.py) | Quatro políticas numa conta: as quatro taxas de contenção e o ranking que cada uma produz, quais contatos o bot ficou, o que a fila recebeu contra o que foi afirmado, e o business case de headcount decomposto nos seus três erros. |
+| [`examples/02_the_meter_that_was_noise.py`](examples/02_the_meter_that_was_noise.py) | O estudo do instrumento rodado antes da comparação: repetibilidade, reprodutibilidade, viés contra um padrão declarado, o fator exato pelo qual o painel encolhe toda diferença, o que isso custa em sessões, e contra o que um juiz automático seria validado. |
 
 ## Instalar e rodar
 
@@ -97,12 +131,13 @@ python -m pip install -e ".[dev]"
 make check       # lint, tipos e a suíte rápida - o que libera um push
 make check-all   # o acima mais toda cifra documentada re-derivada
 python examples/01_the_containment_that_wasnt.py
+python examples/02_the_meter_that_was_noise.py
 ```
 
 ## Como as afirmações são mantidas honestas
 
-**107 testes, 100% de cobertura de linhas e de ramos.** 92 deles rodam em segundos e liberam cada push.
-Os 15 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
+**152 testes, 100% de cobertura de linhas e de ramos.** 129 deles rodam em segundos e liberam cada push.
+Os 23 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
 rodam o script de exemplo. Uma mudança que mova um número publicado quebra o build em vez de deixar o
 texto silenciosamente errado.
 
@@ -127,11 +162,13 @@ modo que a posição no stream depende de quantos valores são pedidos e não de
 responde. Essa regra é verificada contra o código-fonte, porque um repositório irmão publicou cifras
 que valiam numa máquina e mudavam numa instalação limpa.
 
-**E defeitos são registrados em vez de corrigidos em silêncio.** Cinco até aqui, em
-[`docs/ROADMAP.md`](docs/ROADMAP.md), todos os cinco achados conectando os módulos, por um caso de
-controle ou verificando uma frase. O primeiro é o que vale ler: a sessão original cobrava um recontato
-como segundos extras em vez de como uma linha, o que torna o desvio aritmeticamente idêntico à contenção
-e esconde o achado inteiro atrás de uma tautologia.
+**E defeitos são registrados em vez de corrigidos em silêncio.** Nove até aqui, em
+[`docs/ROADMAP.md`](docs/ROADMAP.md), cada um deles achado conectando os módulos, por um caso de
+controle ou verificando uma frase — nenhum lendo código. Dois valem a leitura. A sessão original cobrava
+um recontato como segundos extras em vez de como uma linha, o que torna o desvio aritmeticamente
+idêntico à contenção e esconde o achado inteiro atrás de uma tautologia. E o id de sessão de um
+recontato era único apenas dentro de uma execução, o que nada na onda 1 poderia expor porque a onda 1
+nunca juntava duas execuções — a onda 2 juntou os braços e os vetores pararam de se alinhar.
 
 Ver [`docs/ROADMAP.md`](docs/ROADMAP.md) para o que está construído, o que está deliberadamente ausente
 — inclusive por que não há modelo de linguagem aqui — e o que continua aberto.

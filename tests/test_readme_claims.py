@@ -7,16 +7,30 @@ instead of leaving the text quietly wrong.
 
 from __future__ import annotations
 
+import math
 import subprocess
 import sys
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
 import pytest
 
 from svclab.bot import GUARDED, HUMAN_ONLY, PATIENT, POLICIES, THREE_TURNS, run
 from svclab.capacity import agents_for, capacity_table, erlang_b, erlang_c, occupancy, service_level
 from svclab.containment import containment_table, deflection, selection_profile
-from svclab.synth import CENTRE, Dataset
+from svclab.quality import (
+    agreement_table,
+    attenuation,
+    judge_verdicts,
+    kappa,
+    latent_quality,
+    panel_verdicts,
+    reproducibility,
+    sessions_for_difference,
+    youden,
+)
+from svclab.synth import CENTRE, QUALITY, Dataset
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -346,3 +360,172 @@ def test_the_example_runs(script: str) -> None:
     )
     assert result.returncode == 0, result.stderr[-2000:]
     assert result.stdout.strip()
+
+
+# --- svclab.quality ----------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def graded(full: Dataset) -> tuple:
+    """The two arms' sessions pooled, and every reading of them."""
+    treated = full.contacts[~full.contacts["holdout"]]
+    held = full.contacts[full.contacts["holdout"]]
+    bot = latent_quality(run(treated, THREE_TURNS), full.contacts)
+    control = latent_quality(run(held, HUMAN_ONLY), full.contacts)
+    everything = pd.concat([bot, control], ignore_index=True)
+    panel = panel_verdicts(everything, full.panel_noise)
+    judged = judge_verdicts(everything, full.judge_noise)
+    return bot, control, everything, panel, judged
+
+
+def test_the_gauge_study_is_the_size_the_readme_quotes(graded: tuple, full: Dataset) -> None:
+    _, _, _, panel, judged = graded
+    assert QUALITY.sample == 1_200
+    assert QUALITY.replicates == 2
+    assert full.panel_noise["contact"].nunique() == 1_200
+    assert panel["session"].nunique() == 1_434
+    assert len(panel) == 8_604
+    assert len(judged) == 47_019
+
+
+def test_the_panel_agreement_table_is_what_is_published(graded: tuple) -> None:
+    _, _, everything, panel, _ = graded
+    published = {
+        "avaliador-1": (2_868, 0.5683, 0.8298, 0.6533, 0.8675, 0.9252, 0.8069, 0.7320),
+        "avaliador-2": (2_868, 0.3815, 0.8117, 0.6010, 0.8417, 0.7177, 0.9721, 0.6898),
+        "avaliador-3": (2_868, 0.4829, 0.7664, 0.5322, 0.8302, 0.8054, 0.8562, 0.6617),
+    }
+    table = agreement_table(panel, everything).set_index("assessor")
+    for grader, values in published.items():
+        readings, rate, repeat, repeat_kappa, truth, sens, spec, index = values
+        row = table.loc[grader]
+        assert int(row["readings"]) == readings, grader
+        assert float(row["pass_rate"]) == pytest.approx(rate, abs=5e-5), grader
+        assert float(row["repeatability"]) == pytest.approx(repeat, abs=5e-5), grader
+        assert float(row["repeatability_kappa"]) == pytest.approx(repeat_kappa, abs=5e-5), grader
+        assert float(row["agreement_with_truth"]) == pytest.approx(truth, abs=5e-5), grader
+        assert float(row["sensitivity"]) == pytest.approx(sens, abs=5e-5), grader
+        assert float(row["specificity"]) == pytest.approx(spec, abs=5e-5), grader
+        assert float(row["youden"]) == pytest.approx(index, abs=5e-5), grader
+
+    # The derived claims the prose makes about that table.
+    rates = table["pass_rate"]
+    assert float(rates.max()) / float(rates.min()) == pytest.approx(1.49, abs=5e-3)
+    assert (1.0 - float(table["repeatability"].max())) == pytest.approx(0.170, abs=5e-4)
+    assert (1.0 - float(table["repeatability"].min())) == pytest.approx(0.234, abs=5e-4)
+    assert (1.0 - float(table.loc["avaliador-1", "specificity"])) == pytest.approx(0.1931, abs=5e-5)
+    assert (1.0 - float(table.loc["avaliador-2", "specificity"])) == pytest.approx(0.0279, abs=5e-5)
+
+
+def test_the_reproducibility_table_is_what_is_published(graded: tuple) -> None:
+    _, _, _, panel, _ = graded
+    published = {
+        "avaliador-1 vs avaliador-2": (1_434, 0.7615, 0.5355),
+        "avaliador-1 vs avaliador-3": (1_434, 0.7824, 0.5668),
+        "avaliador-2 vs avaliador-3": (1_434, 0.7741, 0.5440),
+    }
+    table = reproducibility(panel).set_index("pair")
+    for pair, (sessions, agreement, measure) in published.items():
+        row = table.loc[pair]
+        assert int(row["sessions"]) == sessions, pair
+        assert float(row["agreement"]) == pytest.approx(agreement, abs=5e-5), pair
+        assert float(row["kappa"]) == pytest.approx(measure, abs=5e-5), pair
+    # Every pair agrees far more than kappa credits, which is the point of printing both.
+    assert (table["agreement"] > table["kappa"] + 0.20).all()
+
+
+def test_the_attenuation_figures_are_what_is_published(graded: tuple) -> None:
+    """The wave's centrepiece: the panel reports 69.45% of the real difference, exactly."""
+    bot, control, everything, panel, _ = graded
+    table = agreement_table(panel, everything)
+    control_rate = float(control["acceptable"].mean())
+    bot_rate = float(bot["acceptable"].mean())
+    sensitivity = float(table["sensitivity"].mean())
+    specificity = float(table["specificity"].mean())
+
+    assert control_rate == pytest.approx(0.959616, abs=5e-7)
+    assert bot_rate == pytest.approx(0.413712, abs=5e-7)
+    assert control_rate - bot_rate == pytest.approx(0.545904, abs=5e-7)
+    assert sensitivity == pytest.approx(0.8161, abs=5e-5)
+    assert specificity == pytest.approx(0.8784, abs=5e-5)
+
+    measured = attenuation(control_rate, bot_rate, sensitivity, specificity)
+    assert measured["factor"] == pytest.approx(0.694497, abs=5e-7)
+    assert measured["observed_difference"] == pytest.approx(0.379129, abs=5e-7)
+    assert measured["first_observed"] == pytest.approx(0.788053, abs=5e-7)
+    assert measured["second_observed"] == pytest.approx(0.408925, abs=5e-7)
+    # And the identity itself, which is what makes the figure above a consequence rather than a
+    # coincidence.
+    assert measured["observed_difference"] == pytest.approx(
+        measured["true_difference"] * measured["factor"], abs=1e-14
+    )
+
+
+def test_the_sample_size_inflation_is_what_is_published(graded: tuple) -> None:
+    bot, control, everything, panel, _ = graded
+    table = agreement_table(panel, everything)
+    control_rate = float(control["acceptable"].mean())
+    bot_rate = float(bot["acceptable"].mean())
+    sensitivity = float(table["sensitivity"].mean())
+    specificity = float(table["specificity"].mean())
+
+    perfect = sessions_for_difference(control_rate, bot_rate)
+    actual = sessions_for_difference(control_rate, bot_rate, sensitivity, specificity)
+    assert perfect == pytest.approx(10.07, abs=5e-3)
+    assert actual == pytest.approx(25.03, abs=5e-3)
+    assert actual / perfect == pytest.approx(2.4864, abs=5e-5)
+    square_law = 1.0 / youden(sensitivity, specificity) ** 2
+    assert square_law == pytest.approx(2.0733, abs=5e-5)
+    # The claim the document makes about the two: the rule of thumb understates the bill.
+    assert actual / perfect > square_law
+
+
+def test_the_judge_figures_are_what_is_published(graded: tuple) -> None:
+    _, _, everything, panel, judged = graded
+    row = agreement_table(judged, everything).iloc[0]
+    assert row["assessor"] == "juiz-automatico"
+    assert float(row["agreement_with_truth"]) == pytest.approx(0.8850, abs=5e-5)
+    assert float(row["sensitivity"]) == pytest.approx(0.9937, abs=5e-5)
+    assert float(row["specificity"]) == pytest.approx(0.7705, abs=5e-5)
+    assert float(row["youden"]) == pytest.approx(0.7642, abs=5e-5)
+    assert math.isnan(float(row["repeatability"]))
+
+    panel_table = agreement_table(panel, everything)
+    assert float(row["agreement_with_truth"]) > float(panel_table["agreement_with_truth"].max())
+    assert float(row["youden"]) > float(panel_table["youden"].max())
+
+
+def test_what_the_judge_would_be_validated_against_is_what_is_published(graded: tuple) -> None:
+    """Result 5: the same judge scores 0.5450 to 0.7121 depending on whose week it was."""
+    _, _, everything, panel, judged = graded
+    first = panel[panel["replicate"] == 1]
+    published = {
+        "avaliador-1": (0.8598, 0.7121),
+        "avaliador-2": (0.7608, 0.5450),
+        "avaliador-3": (0.8082, 0.6198),
+    }
+    measured = {}
+    for grader, frame in first.groupby("assessor"):
+        merged = frame.merge(judged[["session", "verdict"]], on="session", suffixes=("_p", "_j"))
+        agreement = float(np.mean(merged["verdict_p"] == merged["verdict_j"]))
+        measure = kappa(merged["verdict_p"], merged["verdict_j"])
+        measured[grader] = measure
+        assert agreement == pytest.approx(published[grader][0], abs=5e-5), grader
+        assert measure == pytest.approx(published[grader][1], abs=5e-5), grader
+    assert max(measured.values()) - min(measured.values()) == pytest.approx(0.1671, abs=5e-5)
+
+    majority = first.groupby("session")["verdict"].mean() >= 0.5
+    sample = majority.index
+    judge_sample = judged.set_index("session").reindex(sample)["verdict"].to_numpy(dtype=bool)
+    truth = everything.set_index("session").reindex(sample)["acceptable"].to_numpy(dtype=bool)
+    votes = majority.to_numpy(dtype=bool)
+
+    assert float(np.mean(judge_sample == votes)) == pytest.approx(0.8466, abs=5e-5)
+    assert kappa(judge_sample, votes) == pytest.approx(0.6948, abs=5e-5)
+    assert float(np.mean(judge_sample == truth)) == pytest.approx(0.8919, abs=5e-5)
+    assert kappa(judge_sample, truth) == pytest.approx(0.7826, abs=5e-5)
+    assert float(np.mean(votes == truth)) == pytest.approx(0.8989, abs=5e-5)
+    assert kappa(votes, truth) == pytest.approx(0.7979, abs=5e-5)
+    # The two claims the document ends on, as orderings.
+    assert kappa(judge_sample, truth) > kappa(judge_sample, votes)
+    assert kappa(votes, truth) > kappa(judge_sample, truth)

@@ -18,6 +18,7 @@ from svclab.bot import (
     OUTCOMES,
     PATIENT,
     POLICIES,
+    REPEAT_SESSION_OFFSET,
     THREE_TURNS,
     BotPolicy,
     run,
@@ -156,6 +157,33 @@ class TestThePropertiesEveryComparisonNeeds:
         outcomes = run(nobody, THREE_TURNS)
         assert len(outcomes) == len(nobody)
         assert not outcomes["is_repeat"].any()
+
+    def test_a_repeat_session_id_is_derived_from_its_contact(
+        self, hand_contacts: pd.DataFrame
+    ) -> None:
+        """So that pooling two runs cannot produce two different sessions sharing an id.
+
+        The first version numbered repeats from one past the largest contact **in that call**, which
+        made ids unique only within a run. Pooling the treated and control arms - which is exactly
+        what a quality study does - then silently collided, and the defect surfaced two waves later.
+        """
+        outcomes = run(hand_contacts, THREE_TURNS)
+        repeat = outcomes[outcomes["is_repeat"]].iloc[0]
+        assert int(repeat["session"]) == int(repeat["contact"]) + REPEAT_SESSION_OFFSET
+        other = hand_contacts.copy()
+        other["contact"] = other["contact"] + 500
+        other["customer"] = other["customer"] + 500
+        pooled = pd.concat([outcomes, run(other, THREE_TURNS)], ignore_index=True)
+        assert pooled["session"].is_unique
+
+    def test_a_contact_id_that_reaches_the_offset_is_refused(
+        self, hand_contacts: pd.DataFrame
+    ) -> None:
+        """A centre larger than the offset would wrap repeats onto real contacts."""
+        huge = hand_contacts.copy()
+        huge["contact"] = huge["contact"] + REPEAT_SESSION_OFFSET
+        with pytest.raises(ValueError, match="collides with the repeat session offset"):
+            run(huge, THREE_TURNS)
 
     def test_a_contact_that_would_self_serve_does_not_come_back(
         self, hand_contacts: pd.DataFrame

@@ -204,3 +204,84 @@ CENTRE = CentreProfile(
     target_answer_seconds=20.0,
     target_service_level=0.80,
 )
+
+
+@dataclass(frozen=True)
+class GraderProfile:
+    """One quality assessor, described by the two ways they are wrong.
+
+    Attributes:
+        grader: Invented label for the assessor.
+        bias: How much this assessor's reading of a session sits above the truth. Positive is a
+            lenient grader, negative a strict one. This is the **reproducibility** problem: two
+            graders who disagree on average disagree on every batch.
+        noise_sd: Spread of this assessor's reading around their own average. This is the
+            **repeatability** problem: the same grader, the same session, a different verdict.
+    """
+
+    grader: str
+    bias: float
+    noise_sd: float
+
+
+#: A three-person quality panel. Their spread is not a pathological construction - a lenient
+#: grader, a strict one, and one who is closest to the standard and noisiest around it is what a
+#: calibration study finds when somebody finally runs one.
+GRADERS = (
+    GraderProfile(grader="avaliador-1", bias=0.06, noise_sd=0.11),
+    GraderProfile(grader="avaliador-2", bias=-0.07, noise_sd=0.09),
+    GraderProfile(grader="avaliador-3", bias=0.01, noise_sd=0.15),
+)
+
+#: The automated assessor: cheaper, grades everything, and wrong in its own way rather than in the
+#: panel's way. Deliberately given a **smaller** spread and a **larger** bias than the panel's
+#: average, because that combination is what makes Result 5 possible.
+JUDGE = GraderProfile(grader="juiz-automatico", bias=0.09, noise_sd=0.06)
+
+
+@dataclass(frozen=True)
+class QualityProfile:
+    """The declared quality of a session, and the standard it is judged against.
+
+    Attributes:
+        standard: The latent score at or above which a session is genuinely acceptable. A declared
+            threshold rather than an inferred one, which is what makes accuracy computable here and
+            not computable anywhere else.
+        sample: Sessions the human panel grades. Real quality assurance reads a sample, and the
+            sample size is the lever everybody pulls before checking whether the instrument works.
+        replicates: How many times each grader reads each sampled session. Two, because
+            repeatability cannot be estimated from one reading and almost no operation collects the
+            second.
+        resolved_by_bot: Latent quality of a contact the bot resolved, at difficulty zero.
+        straight_to_human: Latent quality of a contact that went to a human directly.
+        escalated: Latent quality of a contact the bot escalated - lower than going direct, because
+            the customer explained themselves twice.
+        repeat_to_human: Latent quality of a second attempt at the same unresolved issue.
+        abandoned: Latent quality of a session the customer walked out of. Flat: there is no version
+            of this that is acceptable.
+        difficulty_penalty: How much latent quality falls across the difficulty range, for every
+            outcome except abandonment.
+    """
+
+    standard: float
+    sample: int
+    replicates: int
+    resolved_by_bot: float
+    straight_to_human: float
+    escalated: float
+    repeat_to_human: float
+    abandoned: float
+    difficulty_penalty: float
+
+
+QUALITY = QualityProfile(
+    standard=0.50,
+    sample=1_200,
+    replicates=2,
+    resolved_by_bot=0.72,
+    straight_to_human=0.80,
+    escalated=0.62,
+    repeat_to_human=0.45,
+    abandoned=0.15,
+    difficulty_penalty=0.30,
+)
