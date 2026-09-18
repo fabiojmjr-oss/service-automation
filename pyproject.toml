@@ -1,0 +1,90 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "svclab"
+version = "0.1.0"
+description = "Customer service automation under a decision standard: bots that actually run against a seeded contact centre, and the capacity and containment arithmetic their business cases get wrong."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "fabiojmjr-oss" }]
+keywords = [
+  "customer-service",
+  "contact-centre",
+  "automation",
+  "agents",
+  "chatbot",
+  "containment",
+  "queueing-theory",
+  "erlang",
+  "operations-research",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=2.2",
+  "scipy>=1.11",
+]
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.7"]
+# Linters are pinned to a compatible release rather than floating, because a formatter that
+# gains a rule between a local run and a CI run turns a correct change into a red build.
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff~=0.16.7",
+  "mypy~=2.3.1",
+  "pandas-stubs",
+  "scipy-stubs",
+]
+
+[project.urls]
+Homepage = "https://github.com/fabiojmjr-oss/service-automation"
+Source = "https://github.com/fabiojmjr-oss/service-automation"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/svclab"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RET", "PD"]
+ignore = ["PD010", "PD011"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+
+[tool.mypy]
+# No python_version pin: CI runs a version matrix, and pinning it makes mypy reject the
+# numpy stubs of whichever interpreter is newer than the pin.
+files = ["src/svclab"]
+strict = false
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+  "slow: re-derives a figure quoted in a README, or runs an example script",
+]
+
+[tool.coverage.run]
+source = ["svclab"]
+branch = true
