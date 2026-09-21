@@ -38,6 +38,16 @@ from svclab.chain import (
 from svclab.concentration import burden_table, concentration_table, precision_table
 from svclab.containment import containment_table, deflection, selection_profile
 from svclab.experiment import intracluster_correlation, sizing_table
+from svclab.planning import (
+    Constraints,
+    agents_at_ceiling,
+    agents_for_constraints,
+    headroom,
+    metrics_at,
+    plan_table,
+    scale_table,
+    unmet,
+)
 from svclab.population import (
     correlation_table,
     design_table,
@@ -772,6 +782,126 @@ def test_the_time_to_resolution_is_what_is_published(full: Dataset) -> None:
     assert by("containment", False) == ["patient", "three-turns", "guarded", "human-only"]
     assert by("eventual_resolution", False) == ["human-only", "guarded", "three-turns", "patient"]
     assert by("days_to_resolution", True) == ["human-only", "guarded", "three-turns", "patient"]
+
+
+# --- svclab.planning ----------------------------------------------------------------------------
+
+#: Wave 1's queue and wave 3's patience, which every plan in wave 7 is priced against.
+PLAN_LOAD = 7.5845
+PLAN_HANDLING = 512.25
+PLAN_PATIENCE = 240.0
+PLAN_TARGET = 20.0
+EVERY_CEILING = Constraints(service_level=0.80, max_occupancy=0.85, max_abandonment=0.05)
+
+
+def test_the_plans_and_what_decided_them_are_what_is_published() -> None:
+    published = {
+        "service level only": (
+            Constraints(service_level=0.80),
+            11,
+            0.8368,
+            0.0324,
+            0.6672,
+            "service level",
+        ),
+        "occupancy only": (
+            Constraints(max_occupancy=0.85),
+            8,
+            0.1751,
+            0.1434,
+            0.8121,
+            "occupancy",
+        ),
+        "abandonment only": (
+            Constraints(max_abandonment=0.05),
+            11,
+            0.8368,
+            0.0324,
+            0.6672,
+            "abandonment",
+        ),
+        "all three": (EVERY_CEILING, 11, 0.8368, 0.0324, 0.6672, "service level + abandonment"),
+    }
+    plans = {name: figures[0] for name, figures in published.items()}
+    table = plan_table(plans, PLAN_LOAD, PLAN_HANDLING, PLAN_PATIENCE).set_index("plan")
+    for name, (_plan, agents, level, leaving, busy, binding) in published.items():
+        row = table.loc[name]
+        assert int(row["agents"]) == agents, name
+        assert float(row["service_level"]) == pytest.approx(level, abs=5e-5), name
+        assert float(row["abandonment"]) == pytest.approx(leaving, abs=5e-5), name
+        assert float(row["occupancy"]) == pytest.approx(busy, abs=5e-5), name
+        assert row["binding"] == binding, name
+
+
+def test_wave_threes_stable_queue_fails_every_declared_ceiling() -> None:
+    measured = metrics_at(6, PLAN_LOAD, PLAN_HANDLING, PLAN_PATIENCE, PLAN_TARGET)
+    assert float(measured["service_level"]) == pytest.approx(0.0, abs=5e-5)
+    assert float(measured["occupancy"]) == pytest.approx(0.8945, abs=5e-5)
+    assert float(measured["abandonment"]) == pytest.approx(0.2923, abs=5e-5)
+    assert set(unmet(6, PLAN_LOAD, PLAN_HANDLING, PLAN_PATIENCE, EVERY_CEILING)) == {
+        "service level",
+        "occupancy",
+        "abandonment",
+    }
+
+
+def test_the_napkin_is_short_by_what_is_published() -> None:
+    napkin = agents_at_ceiling(PLAN_LOAD, 0.85)
+    needed = agents_for_constraints(PLAN_LOAD, PLAN_HANDLING, PLAN_PATIENCE, EVERY_CEILING)
+    assert napkin == 9
+    assert needed == 11
+    assert 1.0 - napkin / needed == pytest.approx(0.18, abs=5e-3)
+
+
+def test_the_scale_of_the_queue_moves_the_binding_ceiling_by_what_is_published() -> None:
+    published = {
+        1.0: (3, 3.0000, 0.9159, 0.0339, 0.3220, "service level + abandonment"),
+        2.5: (5, 2.0000, 0.8818, 0.0358, 0.4821, "service level + abandonment"),
+        7.5845: (11, 1.4503, 0.8368, 0.0324, 0.6672, "service level + abandonment"),
+        20.0: (25, 1.2500, 0.8280, 0.0232, 0.7814, "service level"),
+        50.0: (59, 1.1800, 0.8932, 0.0108, 0.8383, "occupancy"),
+        100.0: (118, 1.1800, 0.9745, 0.0026, 0.8453, "occupancy"),
+        400.0: (471, 1.1775, 1.0000, 0.0000, 0.8493, "occupancy"),
+    }
+    table = scale_table(tuple(published), PLAN_HANDLING, PLAN_PATIENCE, EVERY_CEILING).set_index(
+        "load"
+    )
+    for load, (agents, ratio, level, leaving, busy, binding) in published.items():
+        row = table.loc[load]
+        assert int(row["agents"]) == agents, load
+        assert float(row["agents_per_erlang"]) == pytest.approx(ratio, abs=5e-5), load
+        assert float(row["service_level"]) == pytest.approx(level, abs=5e-5), load
+        assert float(row["abandonment"]) == pytest.approx(leaving, abs=5e-5), load
+        assert float(row["occupancy"]) == pytest.approx(busy, abs=5e-5), load
+        assert row["binding"] == binding, load
+    smallest = float(table.loc[1.0, "agents_per_erlang"])
+    largest = float(table.loc[400.0, "agents_per_erlang"])
+    assert 1.0 - largest / smallest == pytest.approx(0.61, abs=5e-3)
+
+
+def test_the_turning_point_of_the_binding_ceiling_is_where_it_is_published() -> None:
+    """The README says the service level binds to about 35 erlangs and occupancy alone from 45."""
+    at_35 = scale_table((34.0,), PLAN_HANDLING, PLAN_PATIENCE, EVERY_CEILING).iloc[0]
+    at_45 = scale_table((45.0,), PLAN_HANDLING, PLAN_PATIENCE, EVERY_CEILING).iloc[0]
+    assert at_35["binding"] == "service level"
+    assert at_45["binding"] == "occupancy"
+
+
+def test_the_headroom_at_the_chosen_headcount_is_what_is_published() -> None:
+    published = {
+        11: (0.0368, 0.1828, 0.0176),
+        12: (0.1138, 0.2290, 0.0326),
+    }
+    for agents, (level, busy, leaving) in published.items():
+        slack = headroom(agents, PLAN_LOAD, PLAN_HANDLING, PLAN_PATIENCE, EVERY_CEILING)
+        assert slack["service level"] == pytest.approx(level, abs=5e-5), agents
+        assert slack["occupancy"] == pytest.approx(busy, abs=5e-5), agents
+        assert slack["abandonment"] == pytest.approx(leaving, abs=5e-5), agents
+    thinnest = min(
+        headroom(11, PLAN_LOAD, PLAN_HANDLING, PLAN_PATIENCE, EVERY_CEILING).items(),
+        key=lambda item: item[1],
+    )
+    assert thinnest[0] == "abandonment"
 
 
 # --- The example -------------------------------------------------------------------------------

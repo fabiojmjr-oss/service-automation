@@ -268,6 +268,36 @@ can rank resolution. Wave 6 adds that resolution is not the whole of what the cu
 either: a problem fixed after two returns and three days was fixed **and** the customer waited three
 days. A rate has no time in it — and three days is not a rounding error on a KPI, it is the complaint.
 
+## And every plan above staffed to one target and reported the rest
+
+Wave 3's sharpest line was a queue **perfectly stable** at six agents — with 29.23% of the customers
+abandoning and the survivors' agents at 89.45% occupancy. Both were outputs. No real plan treats them
+that way: an occupancy ceiling is what stops attrition and an abandonment ceiling is what the brand or
+the regulator asks for. So the arithmetic is inverted — declare the ceilings, take whatever headcount
+satisfies all of them, and **say which one decided it**.
+
+- **An occupancy ceiling on its own is satisfied by understaffing.** Eight agents hold occupancy at
+  0.8121 — and answer **17.51%** of contacts inside the target while **14.34% of customers give up**.
+  The customers who abandon are what keeps the occupancy down, so an occupancy target chased alone
+  rewards a queue for losing people. Meanwhile the service level and the abandonment ceiling reach the
+  same **11 agents** by independent routes and then bind **together**: at ten, both fail.
+- **Which settles what wave 3 left open: six agents fails all three ceilings.** Service level 0.0000
+  against 0.80, occupancy 0.8945 against 0.85, abandonment 0.2923 against 0.05. Stability means the
+  queue has a steady state — it does, with one customer in three walking away. **Stability is not a
+  plan.**
+- **And the napkin is short by 18%.** `load / occupancy ceiling` gives 9 agents where the queue needs
+  **11** — wave 1's headcount error in a new costume: the promise there multiplied a queue by a
+  proportion, and this divides one by a proportion. Neither is a queue.
+- **Which ceiling binds depends on how big the queue is, and that is the case for consolidation — with
+  an end.** Agents per erlang falls from **3.00** at one erlang to **1.18** at four hundred, a 61%
+  drop. But the binding constraint is the service level up to about 35 erlangs and **the occupancy
+  ceiling alone from 45 upward**: past that point the queue is limited by the agent's tolerance rather
+  than the customer's, and those two are negotiated with different people.
+- **And "compliant" and "one absence from breaching" are the same sentence.** At eleven agents the
+  slack is +0.0368 on service level, +0.1828 on occupancy and **+0.0176 on abandonment** — the
+  thinnest of the three. A plan that reports "all constraints met" and one that reports the margins
+  are the same plan, and only the second says which number moves first when somebody calls in sick.
+
 ## Modules
 
 | Module | What it decides |
@@ -282,6 +312,7 @@ days. A rate has no time in it — and three days is not a rounding error on a K
 | [`svclab.population`](src/svclab/population/README.md) | What the independence assumption was worth: how much of a correlation between customers survives into the outcome a test is run on, what the surviving part costs, and what the usual correction for it costs instead. |
 | [`svclab.concentration`](src/svclab/concentration/README.md) | What grouping decides once customers do not all contact equally often: how unequal the clusters really are, which of the two cluster sizes belongs in a design effect, who pays for the failures, and how much precision a per-customer estimate loses. |
 | [`svclab.chain`](src/svclab/chain/README.md) | What a contact that comes back twice costs, how long a return chain really is and the closed form that says why, and the third ranking of the policies — days to resolution, which no rate contains. |
+| [`svclab.planning`](src/svclab/planning/README.md) | What headcount a set of declared ceilings buys rather than what one target reports, which of the ceilings actually decided it, how that changes with the size of the queue, and how close to breaching the chosen plan sits. |
 
 Every module README is bilingual and carries an **Assumptions and limitations** section, because a
 figure without its assumptions is not a result.
@@ -296,6 +327,7 @@ figure without its assumptions is not a result.
 | [`examples/04_the_customer_who_was_a_label.py`](examples/04_the_customer_who_was_a_label.py) | The same account built twice from the same noise: whether the correlation moves anything already published, how much of it reaches the outcome, what it costs a comparison, how many people are failed twice, and what three different standard errors say about one difference. |
 | [`examples/05_the_frequent_caller.py`](examples/05_the_frequent_caller.py) | The identical contacts regrouped into customers who contact at different rates, with the heavy users correlated with the difficult ones: the shape of the clusters, the design effect that returns, who pays for it, and what it costs the precision of wave 1's estimate. |
 | [`examples/06_the_contact_that_came_back_twice.py`](examples/06_the_contact_that_came_back_twice.py) | The tail five waves truncated, run to its declared end: how many attempts a contact takes, the geometric series that says when that matters, what the chain costs each policy, and the ranking with time in it. |
+| [`examples/07_the_constraint_nobody_declared.py`](examples/07_the_constraint_nobody_declared.py) | The three ceilings declared instead of reported: what each buys on its own, what wave 3's stable queue fails, where the economy of scale stops, and how much room the chosen plan has left. |
 
 ## Install and run
 
@@ -309,12 +341,13 @@ python examples/03_three_numbers_nobody_priced.py
 python examples/04_the_customer_who_was_a_label.py
 python examples/05_the_frequent_caller.py
 python examples/06_the_contact_that_came_back_twice.py
+python examples/07_the_constraint_nobody_declared.py
 ```
 
 ## How the claims are kept honest
 
-**306 tests, 100% statement and branch coverage.** 255 of them run in seconds and gate every push. The
-remaining 51 re-derive, from the generator, every figure quoted in every README on this repository,
+**338 tests, 100% statement and branch coverage.** 280 of them run in seconds and gate every push. The
+remaining 58 re-derive, from the generator, every figure quoted in every README on this repository,
 and run the example script. A change that moves a published number breaks the build instead of leaving
 the text quietly wrong.
 
@@ -339,7 +372,7 @@ position depends on how many values are asked for and not on which library versi
 is checked against the source, because a sibling repository published figures that held on one machine
 and moved on a clean install.
 
-**And defects are recorded rather than quietly fixed.** Thirty-one so far, in
+**And defects are recorded rather than quietly fixed.** Thirty-three so far, in
 [`docs/ROADMAP.md`](docs/ROADMAP.md), every one of them found by connecting the modules, by a control
 case or by verifying a sentence — none by reading code. Two are worth reading. The original session
 charged a repeat contact as extra seconds rather than as a row, which makes deflection arithmetically

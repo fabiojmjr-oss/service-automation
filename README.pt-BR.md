@@ -268,6 +268,37 @@ experimenta: um problema resolvido depois de dois retornos e três dias foi reso
 esperou três dias. Uma taxa não tem tempo dentro — e três dias não são erro de arredondamento num KPI,
 são a reclamação.
 
+## E todo plano acima dimensionava por uma meta e reportava o resto
+
+A linha mais nítida da onda 3 foi uma fila **perfeitamente estável** com seis atendentes — com 29,23%
+dos clientes abandonando e os atendentes dos sobreviventes a 89,45% de ocupação. As duas coisas eram
+saídas. Nenhum plano real as trata assim: um teto de ocupação é o que contém a rotatividade e um teto de
+abandono é o que a marca ou o regulador pede. Então a aritmética se inverte — declare os tetos, pegue o
+headcount que satisfaz todos eles, e **diga qual deles decidiu**.
+
+- **Um teto de ocupação sozinho é satisfeito subdimensionando.** Oito atendentes mantêm a ocupação em
+  0,8121 — e atendem **17,51%** dos contatos dentro da meta enquanto **14,34% dos clientes desistem**.
+  São os clientes que abandonam que mantêm a ocupação baixa, então uma meta de ocupação perseguida
+  isoladamente premia a fila por perder gente. Enquanto isso, o nível de serviço e o teto de abandono
+  chegam aos mesmos **11 atendentes** por caminhos independentes e então vinculam **juntos**: com dez,
+  os dois falham.
+- **O que resolve o que a onda 3 deixou aberto: seis atendentes falham nos três tetos.** Nível de
+  serviço 0,0000 contra 0,80, ocupação 0,8945 contra 0,85, abandono 0,2923 contra 0,05. Estabilidade
+  significa que a fila tem estado estacionário — e tem, com um cliente em três indo embora.
+  **Estabilidade não é plano.**
+- **E a conta de guardanapo fica 18% curta.** `carga / teto de ocupação` dá 9 atendentes onde a fila
+  precisa de **11** — o erro de headcount da onda 1 com outra fantasia: lá a promessa multiplicava uma
+  fila por uma proporção, aqui divide-se uma por uma proporção. Nenhuma das duas é uma fila.
+- **Qual teto vincula depende do tamanho da fila, e esse é o argumento da consolidação — com um fim.**
+  Atendentes por erlang cai de **3,00** a um erlang para **1,18** a quatrocentos, queda de 61%. Mas a
+  restrição vinculante é o nível de serviço até cerca de 35 erlangs e **o teto de ocupação sozinho a
+  partir de 45**: passado esse ponto a fila é limitada pela tolerância do atendente e não pela do
+  cliente — e essas duas se negociam com pessoas diferentes.
+- **E "em conformidade" e "a uma falta de furar" são a mesma frase.** Com onze atendentes a folga é
+  +0,0368 no nível de serviço, +0,1828 na ocupação e **+0,0176 no abandono** — a mais fina das três. Um
+  plano que reporta "todas as restrições atendidas" e um que reporta as margens são o mesmo plano, e só
+  o segundo diz qual número se move primeiro quando alguém falta.
+
 ## Módulos
 
 | Módulo | O que decide |
@@ -282,6 +313,7 @@ são a reclamação.
 | [`svclab.population`](src/svclab/population/README.md) | Quanto valia a premissa de independência: quanto de uma correlação entre clientes sobrevive até o desfecho em que um teste roda, o que a parte sobrevivente custa, e o que custa a correção usual para ela. |
 | [`svclab.concentration`](src/svclab/concentration/README.md) | O que o agrupamento decide quando os clientes não contatam todos igualmente: quão desiguais os grupos realmente são, qual dos dois tamanhos de grupo entra num efeito de desenho, quem paga pelas falhas, e quanta precisão uma estimativa por cliente perde. |
 | [`svclab.chain`](src/svclab/chain/README.md) | O que custa um contato que volta duas vezes, quão longa é de fato uma cadeia de retornos e a forma fechada que diz por quê, e o terceiro ranking das políticas — dias até resolver, que nenhuma taxa contém. |
+| [`svclab.planning`](src/svclab/planning/README.md) | Que headcount um conjunto de tetos declarados compra em vez do que uma meta única reporta, qual dos tetos de fato decidiu, como isso muda com o tamanho da fila, e a que distância de furar o plano escolhido está. |
 
 Todo README de módulo é bilíngue e traz uma seção **Premissas e limitações**, porque uma cifra sem suas
 premissas não é um resultado.
@@ -296,6 +328,7 @@ premissas não é um resultado.
 | [`examples/04_the_customer_who_was_a_label.py`](examples/04_the_customer_who_was_a_label.py) | A mesma conta construída duas vezes a partir do mesmo ruído: se a correlação move algo já publicado, quanto dela chega ao desfecho, o que custa a uma comparação, quantas pessoas são falhadas duas vezes, e o que três erros padrão diferentes dizem sobre uma mesma diferença. |
 | [`examples/05_the_frequent_caller.py`](examples/05_the_frequent_caller.py) | Os mesmos contatos reagrupados em clientes que contatam em taxas diferentes, com os pesados correlacionados aos difíceis: a forma dos grupos, o efeito de desenho que retorna, quem paga por ele, e o que custa à precisão da estimativa da onda 1. |
 | [`examples/06_the_contact_that_came_back_twice.py`](examples/06_the_contact_that_came_back_twice.py) | A cauda que cinco ondas truncaram, rodada até seu fim declarado: quantas tentativas um contato leva, a série geométrica que diz quando isso importa, o que a cadeia custa a cada política, e o ranking que tem tempo dentro. |
+| [`examples/07_the_constraint_nobody_declared.py`](examples/07_the_constraint_nobody_declared.py) | Os três tetos declarados em vez de reportados: o que cada um compra sozinho, no que a fila estável da onda 3 falha, onde a economia de escala para, e quanto espaço sobra no plano escolhido. |
 
 ## Instalar e rodar
 
@@ -309,12 +342,13 @@ python examples/03_three_numbers_nobody_priced.py
 python examples/04_the_customer_who_was_a_label.py
 python examples/05_the_frequent_caller.py
 python examples/06_the_contact_that_came_back_twice.py
+python examples/07_the_constraint_nobody_declared.py
 ```
 
 ## Como as afirmações são mantidas honestas
 
-**306 testes, 100% de cobertura de linhas e de ramos.** 255 deles rodam em segundos e liberam cada push.
-Os 51 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
+**338 testes, 100% de cobertura de linhas e de ramos.** 280 deles rodam em segundos e liberam cada push.
+Os 58 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
 rodam o script de exemplo. Uma mudança que mova um número publicado quebra o build em vez de deixar o
 texto silenciosamente errado.
 
@@ -339,7 +373,7 @@ modo que a posição no stream depende de quantos valores são pedidos e não de
 responde. Essa regra é verificada contra o código-fonte, porque um repositório irmão publicou cifras
 que valiam numa máquina e mudavam numa instalação limpa.
 
-**E defeitos são registrados em vez de corrigidos em silêncio.** Trinta e um até aqui, em
+**E defeitos são registrados em vez de corrigidos em silêncio.** Trinta e três até aqui, em
 [`docs/ROADMAP.md`](docs/ROADMAP.md), cada um deles achado conectando os módulos, por um caso de
 controle ou verificando uma frase — nenhum lendo código. Dois valem a leitura. A sessão original cobrava
 um recontato como segundos extras em vez de como uma linha, o que torna o desvio aritmeticamente

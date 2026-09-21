@@ -416,6 +416,57 @@ the session runtime, and the two models now agree by construction rather than by
    optional one and an empty stand-in covers the case that can occur, which is the same lesson twice:
    **a guard written from imagination rather than from a path is dead code that looks like care.**
 
+## Wave 7 — the constraint nobody declared *(complete)*
+
+Every plan in waves 1 to 6 staffed to a service level and then reported the occupancy and the
+abandonment it landed on. Wave 3's sharpest line was a queue "perfectly stable" at six agents, with
+29.23% abandoning and the rest handled at 89.45% occupancy - both of them outputs. This wave declares
+all three as ceilings and asks which one decides the headcount.
+
+| Delivered | Where |
+| --- | --- |
+| A plan stated as constraints rather than as a target, refusing to be empty | `planning.Constraints` |
+| The three measures at a staffing level, with occupancy on the **effective** load | `planning.metrics_at` |
+| The smallest headcount that satisfies every declared ceiling | `planning.agents_for_constraints` |
+| Which ceiling one fewer agent would have failed, joined when several bind at once | `planning.binding_constraint` |
+| Every declared plan priced side by side | `planning.plan_table` |
+| The same ceilings against queues from one erlang to four hundred | `planning.scale_table` |
+| How much room each ceiling has left at the chosen headcount | `planning.headroom` |
+| The napkin an occupancy ceiling implies with no queueing model at all | `planning.agents_at_ceiling` |
+
+**The thread from wave 3.** Wave 3 found six agents stable and declined to call it a plan; wave 7
+settles it - six agents **fails all three ceilings**, and "stable" only ever meant the queue has a
+steady state. Wave 1's headcount error also reappears: the promise there multiplied a queue by a
+proportion, and `load / occupancy ceiling` divides one by a proportion. The napkin gives 9 where the
+queue needs 11, short by 18% of the requirement. Neither operation is a queue.
+
+The result I did not expect is the middle row of Result 1. **An occupancy ceiling on its own is
+satisfied by understaffing**: eight agents hold occupancy at 0.8121 while answering 17.51% of contacts
+inside the target and losing 14.34% of customers, because the customers who abandon are exactly what
+keeps the occupancy down. A humane-sounding ceiling, pursued alone, rewards a queue for losing people.
+It is the same shape as wave 1's central finding in a place I was not looking: a correct calculation
+of a quantity nobody chose deliberately.
+
+The second thing I did not expect is where the economy of scale ends. Agents per erlang falls 61% from
+one erlang to four hundred, which is the whole case for consolidating queues - and the binding
+constraint moves from the service level to the occupancy ceiling at about 45 erlangs. Past that point a
+bigger queue does not buy a cheaper plan; it buys a plan whose constraint has changed from an external
+promise into an internal limit, and those are negotiated with different people.
+
+### Defects found and recorded
+
+1. **The same gap quoted on two different bases inside one wave.** The README said the napkin
+   understates the requirement by **18%** and the example said **22%**: `(11 - 9) / 11` against
+   `11 / 9 - 1`. Both are arithmetically true and they are different quantities, so a reader comparing
+   the two artefacts would have found the wave contradicting itself. Standardised on the share of the
+   requirement, with the reason written into the example beside the line. **Third defect in this family
+   about a denominator**, and the first where both numbers were correct.
+2. **A monotonicity the search depends on and nothing had checked.** `agents_for_constraints` searches
+   upward and returns the first satisfying headcount, which is only the *smallest* one if all three
+   measures are weakly monotone in agents. That held, and it was an assumption rather than an assertion
+   until the test that walks the whole search range existed. The habit worth keeping is not the test -
+   it is asking what a search silently assumes before trusting what it returns.
+
 ## What is deliberately not here
 
 - **No language model, and no API call to one.** The bot is a policy plus a declared response curve.
@@ -438,6 +489,13 @@ the session runtime, and the two models now agree by construction rather than by
 
 ## Still open
 
+- **Attrition as a curve rather than a ceiling.** Wave 7 treats 0.84 occupancy as fine and 0.86 as
+  forbidden, when the truth is a rising hazard. Putting attrition in would make occupancy an optimum
+  instead of a constraint, which is a different and better model - and the one that would let a plan
+  trade a point of occupancy against a month of recruitment.
+- **A plan per interval, and shrinkage.** Every headcount in wave 7 staffs one steady state. A real
+  plan solves each half hour and then loses agents to breaks, training and absence, which multiplies
+  every figure here without changing any of the arguments.
 - **A return that arrives on a distribution rather than on a grid.** Every return in wave 6 lands
   exactly one repeat window later, so days to resolution is a multiple of three days. Real returns
   arrive the same afternoon or three weeks later, and the ordering would survive while the levels
@@ -476,10 +534,6 @@ the session runtime, and the two models now agree by construction rather than by
 - **Keying the routing rule on the predicted label rather than the true one.** A deployment cannot see
   the true intent, and the rule has to fire on the classifier's guess. The direction survives; the size
   of the gain would shrink.
-- **Occupancy and abandonment as constraints rather than reports.** Wave 3 shows a stable queue at
-  89.45% occupancy and 29.23% abandonment. Both are outputs here. Real planning puts a ceiling on each
-  and solves for the headcount that respects it — occupancy has a ceiling before attrition rises, and a
-  plan that ignores it buys its service level with turnover.
 - **Correcting for the attenuation rather than measuring it.** Wave 2's factor is measurable, so
   dividing the observed difference by it is available and is deliberately not offered: a correction
   applied to a gauge study this uncertain buys a point estimate and loses the interval. Propagating the
