@@ -207,10 +207,13 @@ clusters on its own.
   a world where everybody contacts at the same rate, which it had assumed rather than chosen. Two wrong
   assumptions in opposite directions whose product was close to right, and a nominal 5% test here is
   really running at **7.65%**.
-- **The cost concentrates faster than the volume.** In the control the heaviest tenth of customers
-  generates 21.97% of the contacts, 22.01% of the failures and 22.01% of the human hours — one number,
-  because being heavy says nothing about being difficult. Concentrated: 31.6% of the volume, 32.7% of
-  the failures and **35.4% of the hours**. And the population failed three times or more goes from 794
+- **The cost concentrates faster than the volume.** Heavy users — four contacts or more in the month,
+  a declared count rather than a decile — are 2,643 people in the control, and they generate 38.75% of
+  the contacts, 38.97% of the failures and 39.01% of the human hours: one number, because being heavy
+  says nothing about being difficult. Concentrated, 2,885 people generate **58.1% of the volume, 59.9%
+  of the failures and 61.2% of the hours**. The separation is the finding — volume and hours differ by
+  0.3 of a point in the control and by **3.1 points** here, because heavy users do not merely contact
+  more, each of their contacts costs more. And the population failed three times or more goes from 794
   customers to **1,305**.
 - **The resolution rate falls 1.53 points with no change of policy at all.** The distribution of
   difficulty **per customer** is unchanged; the distribution **per contact** is not, because the
@@ -265,7 +268,7 @@ python examples/05_the_frequent_caller.py
 
 ## How the claims are kept honest
 
-**270 tests, 100% statement and branch coverage.** 225 of them run in seconds and gate every push. The
+**273 tests, 100% statement and branch coverage.** 228 of them run in seconds and gate every push. The
 remaining 45 re-derive, from the generator, every figure quoted in every README on this repository,
 and run the example script. A change that moves a published number breaks the build instead of leaving
 the text quietly wrong.
@@ -291,7 +294,7 @@ position depends on how many values are asked for and not on which library versi
 is checked against the source, because a sibling repository published figures that held on one machine
 and moved on a clean install.
 
-**And defects are recorded rather than quietly fixed.** Twenty-five so far, in
+**And defects are recorded rather than quietly fixed.** Twenty-six so far, in
 [`docs/ROADMAP.md`](docs/ROADMAP.md), every one of them found by connecting the modules, by a control
 case or by verifying a sentence — none by reading code. Two are worth reading. The original session
 charged a repeat contact as extra seconds rather than as a row, which makes deflection arithmetically

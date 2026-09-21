@@ -101,17 +101,29 @@ def main() -> None:
     control_row = burden.loc["equal rates"]
     heavy = burden.loc["concentrated"]
     print(
-        f"   In the control the three shares are one number:"
-        f" {float(control_row['top_decile_volume']):.4f},"
-        f" {float(control_row['top_decile_unresolved']):.4f},"
-        f" {float(control_row['top_decile_human_hours']):.4f}."
+        f"   Heavy users - four contacts or more, a declared count rather than a decile:"
+        f" {int(control_row['heavy_customers'])} of them in the control."
+    )
+    print(
+        f"   Their three shares there are one number:"
+        f" {float(control_row['heavy_volume']):.4f},"
+        f" {float(control_row['heavy_unresolved']):.4f},"
+        f" {float(control_row['heavy_human_hours']):.4f}."
     )
     print("   Being heavy says nothing about being difficult. Concentration separates them:")
     print(
-        f"   {float(heavy['top_decile_volume']):.1%} of the volume,"
-        f" {float(heavy['top_decile_unresolved']):.1%} of the failures and"
-        f" {float(heavy['top_decile_human_hours']):.1%} of the hours."
+        f"   {float(heavy['heavy_volume']):.1%} of the volume,"
+        f" {float(heavy['heavy_unresolved']):.1%} of the failures and"
+        f" {float(heavy['heavy_human_hours']):.1%} of the hours,"
+        f" from {int(heavy['heavy_customers'])} people."
     )
+    separation = float(heavy["heavy_human_hours"]) - float(heavy["heavy_volume"])
+    control_gap = float(control_row["heavy_human_hours"]) - float(control_row["heavy_volume"])
+    print(
+        f"   Volume and hours differ by {control_gap * 100:.1f} of a point in the control and"
+        f" {separation * 100:.1f} points here:"
+    )
+    print("   heavy users do not merely contact more, each of their contacts costs more.")
     print()
     difficulty = float(heavy["difficulty_per_contact"]) / float(
         control_row["difficulty_per_contact"]

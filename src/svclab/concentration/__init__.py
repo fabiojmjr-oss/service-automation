@@ -3,21 +3,23 @@
 from .measures import (
     BURDEN_COLUMNS,
     CONCENTRATION_COLUMNS,
+    HEAVY_CONTACTS,
     PRECISION_COLUMNS,
-    TOP_SHARE,
     burden_table,
     concentration_table,
     gini,
+    heavy,
     precision_table,
 )
 
 __all__ = [
     "BURDEN_COLUMNS",
     "CONCENTRATION_COLUMNS",
+    "HEAVY_CONTACTS",
     "PRECISION_COLUMNS",
-    "TOP_SHARE",
     "burden_table",
     "concentration_table",
     "gini",
+    "heavy",
     "precision_table",
 ]

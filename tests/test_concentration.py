@@ -19,6 +19,7 @@ from svclab.concentration import (
     burden_table,
     concentration_table,
     gini,
+    heavy,
     precision_table,
 )
 from svclab.experiment import effective_cluster_size
@@ -33,6 +34,27 @@ from svclab.synth import (
     reassign_customers,
 )
 from svclab.synth._draws import to_latent
+
+
+class TestTheHeavyGroup:
+    def test_the_group_is_a_count_and_not_a_rank(self) -> None:
+        """Ties are the whole reason: a rank has to break them and a threshold does not."""
+        counts = pd.Series([1, 1, 2, 4, 4, 9], index=list("abcdef"))
+        assert list(heavy(counts, 4)) == ["d", "e", "f"]
+        assert list(heavy(counts, 2)) == ["c", "d", "e", "f"]
+        assert list(heavy(counts, 10)) == []
+
+    def test_the_order_of_the_customers_cannot_change_the_group(self) -> None:
+        """The property the first version of this module did not have."""
+        counts = pd.Series([4, 1, 4, 2, 4, 1], index=list("abcdef"))
+        shuffled = counts.sample(frac=1.0, random_state=7)
+        assert set(heavy(counts, 4)) == set(heavy(shuffled, 4))
+
+    def test_an_empty_account_or_a_meaningless_cut_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="no customers"):
+            heavy(pd.Series(dtype=float))
+        with pytest.raises(ValueError, match="at least one contact"):
+            heavy(pd.Series([1, 2]), 0)
 
 
 class TestTheTwoShapeMeasures:
@@ -164,14 +186,14 @@ class TestWhatTheTablesSay:
         table = burden_table(treated, outcomes).set_index("world")
         assert list(table.reset_index().columns) == list(BURDEN_COLUMNS)
         control = table.loc["equal rates"]
-        assert float(control["top_decile_unresolved"]) == pytest.approx(
-            float(control["top_decile_volume"]), abs=0.005
+        assert float(control["heavy_unresolved"]) == pytest.approx(
+            float(control["heavy_volume"]), abs=0.005
         )
-        assert float(control["top_decile_human_hours"]) == pytest.approx(
-            float(control["top_decile_volume"]), abs=0.005
+        assert float(control["heavy_human_hours"]) == pytest.approx(
+            float(control["heavy_volume"]), abs=0.005
         )
         heavy = table.loc["concentrated"]
-        assert float(heavy["top_decile_human_hours"]) > float(heavy["top_decile_volume"]) + 0.02
+        assert float(heavy["heavy_human_hours"]) > float(heavy["heavy_volume"]) + 0.02
         assert float(heavy["difficulty_per_contact"]) > float(control["difficulty_per_contact"])
         assert float(heavy["resolution_rate"]) < float(control["resolution_rate"])
         assert int(heavy["customers_failed_three_times"]) > int(

@@ -208,10 +208,13 @@ os grupos por si só.
   demais — num mundo em que todos contatam na mesma taxa, o que ela havia assumido e não escolhido.
   Duas premissas erradas em direções opostas cujo produto ficou perto do certo — e um teste nominal de
   5% aqui roda de fato a **7,65%**.
-- **O custo se concentra mais rápido que o volume.** No controle, o décimo mais pesado de clientes gera
-  21,97% dos contatos, 22,01% das falhas e 22,01% das horas humanas — um único número, porque ser
-  pesado não diz nada sobre ser difícil. Concentrado: 31,6% do volume, 32,7% das falhas e **35,4% das
-  horas**. E a população falhada três vezes ou mais vai de 794 clientes para **1.305**.
+- **O custo se concentra mais rápido que o volume.** Usuários pesados — quatro contatos ou mais no
+  mês, uma contagem declarada e não um decil — são 2.643 pessoas no controle, e geram 38,75% dos
+  contatos, 38,97% das falhas e 39,01% das horas humanas: um único número, porque ser pesado não diz
+  nada sobre ser difícil. Concentrado, 2.885 pessoas geram **58,1% do volume, 59,9% das falhas e 61,2%
+  das horas**. A separação é o achado — volume e horas diferem em 0,3 ponto no controle e em **3,1
+  pontos** aqui, porque usuários pesados não apenas contatam mais: cada contato deles custa mais. E a
+  população falhada três vezes ou mais vai de 794 clientes para **1.305**.
 - **A taxa de resolução cai 1,53 ponto sem mudança nenhuma de política.** A distribuição de dificuldade
   **por cliente** está inalterada; a **por contato** não está, porque os clientes difíceis agora mandam
   mais contatos cada um. A dificuldade média por contato sobe 9,9%. A mistura de dificuldade que a fila
@@ -265,7 +268,7 @@ python examples/05_the_frequent_caller.py
 
 ## Como as afirmações são mantidas honestas
 
-**270 testes, 100% de cobertura de linhas e de ramos.** 225 deles rodam em segundos e liberam cada push.
+**273 testes, 100% de cobertura de linhas e de ramos.** 228 deles rodam em segundos e liberam cada push.
 Os 45 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
 rodam o script de exemplo. Uma mudança que mova um número publicado quebra o build em vez de deixar o
 texto silenciosamente errado.
@@ -291,7 +294,7 @@ modo que a posição no stream depende de quantos valores são pedidos e não de
 responde. Essa regra é verificada contra o código-fonte, porque um repositório irmão publicou cifras
 que valiam numa máquina e mudavam numa instalação limpa.
 
-**E defeitos são registrados em vez de corrigidos em silêncio.** Vinte e cinco até aqui, em
+**E defeitos são registrados em vez de corrigidos em silêncio.** Vinte e seis até aqui, em
 [`docs/ROADMAP.md`](docs/ROADMAP.md), cada um deles achado conectando os módulos, por um caso de
 controle ou verificando uma frase — nenhum lendo código. Dois valem a leitura. A sessão original cobrava
 um recontato como segundos extras em vez de como uma linha, o que torna o desvio aritmeticamente

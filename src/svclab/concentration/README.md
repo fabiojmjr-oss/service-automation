@@ -57,7 +57,9 @@ The treated arm of each world — the identical 31,802 contacts throughout:
 | mean contacts per customer | 2.4300 | 2.9889 |
 | **effective** contacts per customer | 3.2272 | **5.7454** |
 | Gini of the contact counts | 0.3039 | 0.4195 |
-| share of volume from the top decile | 0.2197 | **0.3161** |
+| customers with four contacts or more | 2,643 | 2,885 |
+| their share of the customers | 0.2020 | 0.2711 |
+| their share of the volume | 0.3875 | **0.5809** |
 | correlation of rate with difficulty | 0.0004 | **0.1595** |
 
 Two things to read carefully.
@@ -72,6 +74,14 @@ scale, in the tests, where the construction is exact.
 **And the effective cluster size moves further than the mean.** 2.43 to 2.99 is a 23% rise in the mean;
 3.23 to 5.75 is a 78% rise in the quantity a design effect is actually computed from. Concentration is
 a statement about the variance of the cluster sizes, and the mean barely sees it.
+
+A note on the heavy group. It is defined by a **declared contact count** — four or more in the month —
+and not by a decile. Contact counts are small integers and most customers tie, so "the top tenth of
+customers" is not a set: which of the tied customers falls inside it depends on the order a sort
+happened to leave them in. The first version of this module ranked, two of its published figures moved
+between this machine and the CI runner, and the defect is recorded in
+[`docs/ROADMAP.md`](../../../docs/ROADMAP.md). A count is the same group everywhere, and it is how an
+operation would say it anyway.
 
 ## Result 2: which is where wave 3's alarm comes back
 
@@ -98,16 +108,22 @@ reason.
 | --- | --- | --- |
 | mean difficulty per contact | 0.3352 | **0.3684** |
 | resolution rate | 0.6358 | **0.6205** |
-| top decile's share of volume | 0.2197 | 0.3161 |
-| top decile's share of unresolved contacts | 0.2201 | **0.3265** |
-| top decile's share of human hours | 0.2201 | **0.3541** |
+| heavy users (4+ contacts) | 2,643 | 2,885 |
+| their share of volume | 0.3875 | 0.5809 |
+| their share of unresolved contacts | 0.3897 | **0.5987** |
+| their share of human hours | 0.3901 | **0.6120** |
 | customers failed three times or more | 794 | **1,305** |
 
-**In the control the three shares are one number.** 0.2197, 0.2201, 0.2201 — the heaviest tenth of
-customers generates 22% of the volume and consumes 22% of the queue, because being heavy says nothing
-about being difficult. Concentration separates them: 31.6% of the volume, 32.7% of the failures and
-**35.4% of the human hours**. The cost is more concentrated than the contacts, and the gap between
-those two numbers is what a per-contact cost model cannot represent.
+**In the control the three shares are one number.** 0.3875, 0.3897, 0.3901 — customers with four or
+more contacts generate 38.8% of the volume and consume 39.0% of the queue, because being heavy says
+nothing about being difficult. Concentration separates them: **58.1% of the volume, 59.9% of the
+failures and 61.2% of the human hours**, from 2,885 people out of 10,640.
+
+The separation is the finding, not the level. In the control, volume and hours differ by 0.3 of a
+point; concentrated, they differ by **3.1 points**. Heavy users do not merely contact more — each of
+their contacts costs more, because the same trait drives both. That gap is what a per-contact cost
+model cannot represent, and it is the difference between "our top users are 58% of volume" and "our top
+users are 61% of the work".
 
 And **the resolution rate falls 1.53 points with no change of policy whatsoever.** This is the one
 per-contact figure that moves in this wave, and the mechanism is worth being precise about: the
@@ -239,7 +255,9 @@ O braço tratado de cada mundo — os mesmos 31.802 contatos em todos:
 | contatos médios por cliente | 2,4300 | 2,9889 |
 | contatos **efetivos** por cliente | 3,2272 | **5,7454** |
 | Gini das contagens de contato | 0,3039 | 0,4195 |
-| fração do volume do decil de topo | 0,2197 | **0,3161** |
+| clientes com quatro contatos ou mais | 2.643 | 2.885 |
+| fração dos clientes que eles são | 0,2020 | 0,2711 |
+| fração do volume que eles geram | 0,3875 | **0,5809** |
 | correlação da taxa com a dificuldade | 0,0004 | **0,1595** |
 
 Dois pontos a ler com atenção.
@@ -254,6 +272,14 @@ testes, onde a construção é exata.
 **E o tamanho efetivo de grupo se move mais que a média.** De 2,43 a 2,99 é uma alta de 23% na média;
 de 3,23 a 5,75 é uma alta de 78% na quantidade de que um efeito de desenho é de fato calculado.
 Concentração é uma afirmação sobre a variância dos tamanhos, e a média quase não a vê.
+
+Uma nota sobre o grupo pesado. Ele é definido por uma **contagem declarada de contatos** — quatro ou
+mais no mês — e não por um decil. Contagens de contato são inteiros pequenos e a maioria dos clientes
+empata, então "o décimo de topo dos clientes" não é um conjunto: quais dos empatados caem dentro dele
+depende da ordem em que um sort os deixou. A primeira versão deste módulo ordenava, duas cifras
+publicadas dela se moveram entre esta máquina e o runner do CI, e o defeito está registrado em
+[`docs/ROADMAP.md`](../../../docs/ROADMAP.md). Uma contagem é o mesmo grupo em qualquer lugar — e é
+como uma operação diria de todo modo.
 
 ## Resultado 2: e é aqui que o alarme da onda 3 volta
 
@@ -279,16 +305,22 @@ teste ser aprovado. É por isso que as duas colunas ficam lado a lado.
 | --- | --- | --- |
 | dificuldade média por contato | 0,3352 | **0,3684** |
 | taxa de resolução | 0,6358 | **0,6205** |
-| fração do volume no decil de topo | 0,2197 | 0,3161 |
-| fração dos não resolvidos no decil de topo | 0,2201 | **0,3265** |
-| fração das horas humanas no decil de topo | 0,2201 | **0,3541** |
+| usuários pesados (4+ contatos) | 2.643 | 2.885 |
+| fração do volume que geram | 0,3875 | 0,5809 |
+| fração dos não resolvidos | 0,3897 | **0,5987** |
+| fração das horas humanas | 0,3901 | **0,6120** |
 | clientes falhados três vezes ou mais | 794 | **1.305** |
 
-**No controle as três frações são um único número.** 0,2197, 0,2201, 0,2201 — o décimo mais pesado de
-clientes gera 22% do volume e consome 22% da fila, porque ser pesado não diz nada sobre ser difícil. A
-concentração separa: 31,6% do volume, 32,7% das falhas e **35,4% das horas humanas**. O custo é mais
-concentrado que os contatos, e a distância entre esses dois números é o que um modelo de custo por
-contato não consegue representar.
+**No controle as três frações são um único número.** 0,3875, 0,3897, 0,3901 — clientes com quatro ou
+mais contatos geram 38,8% do volume e consomem 39,0% da fila, porque ser pesado não diz nada sobre ser
+difícil. A concentração separa: **58,1% do volume, 59,9% das falhas e 61,2% das horas humanas**, vindo
+de 2.885 pessoas em 10.640.
+
+A separação é o achado, não o nível. No controle, volume e horas diferem em 0,3 ponto; concentrado,
+diferem em **3,1 pontos**. Usuários pesados não apenas contatam mais — cada contato deles custa mais,
+porque o mesmo traço dirige as duas coisas. Essa distância é o que um modelo de custo por contato não
+representa, e é a diferença entre "nossos usuários de topo são 58% do volume" e "nossos usuários de
+topo são 61% do trabalho".
 
 E **a taxa de resolução cai 1,53 ponto sem mudança nenhuma de política.** Esta é a única cifra por
 contato que se move nesta onda, e vale ser preciso sobre o mecanismo: a distribuição de dificuldade

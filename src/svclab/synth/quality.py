@@ -54,10 +54,14 @@ def quality_noise(
     """
     if quality.sample > centre.contacts:
         raise ValueError(f"the panel cannot sample {quality.sample} of {centre.contacts} contacts")
-    # Sorted uniform keys rather than a shuffle: one uniform per contact, and argsort is
-    # deterministic, so the sample is reproducible without a permutation primitive.
+    # Sorted uniform keys rather than a shuffle: one uniform per contact, so the sample is
+    # reproducible without a permutation primitive. The sort is asked to be stable, which costs
+    # nothing here and removes the only way this could depend on a library internal: two identical
+    # uniforms are vanishingly unlikely and an unstable sort would order them by whatever the
+    # algorithm did that day. Wave 5 found a figure that moved between machines for exactly that
+    # reason elsewhere, and this is the same class of hazard checked off rather than argued about.
     keys = uniform(rng, centre.contacts)
-    sampled = np.sort(np.argsort(keys)[: quality.sample])
+    sampled = np.sort(np.argsort(keys, kind="stable")[: quality.sample])
 
     rows = quality.sample * len(GRADERS) * quality.replicates
     draws = normal(rng, rows)

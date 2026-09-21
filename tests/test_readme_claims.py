@@ -530,19 +530,22 @@ def _regrouped(full: Dataset) -> tuple[dict[str, pd.DataFrame], ...]:
 
 def test_the_shape_of_the_regrouped_account_is_what_is_published(full: Dataset) -> None:
     published = {
-        "equal rates": (13087, 2.4300, 3.2272, 0.3039, 0.2197, 0.0004),
-        "concentrated": (10640, 2.9889, 5.7454, 0.4195, 0.3161, 0.1595),
+        "equal rates": (13087, 2.4300, 3.2272, 0.3039, 2643, 0.2020, 0.3875, 0.0004),
+        "concentrated": (10640, 2.9889, 5.7454, 0.4195, 2885, 0.2711, 0.5809, 0.1595),
     }
     treated, _outcomes, _control = _regrouped(full)
     table = concentration_table(treated).set_index("world")
-    for world, (customers, mean, effective, inequality, decile, correlation) in published.items():
+    for world, figures in published.items():
+        customers, mean, effective, inequality, users, share, volume, correlation = figures
         row = table.loc[world]
         assert int(row["customers"]) == customers, world
         assert int(row["contacts"]) == 31802, world
         assert float(row["mean_cluster_size"]) == pytest.approx(mean, abs=5e-5), world
         assert float(row["effective_cluster_size"]) == pytest.approx(effective, abs=5e-5), world
         assert float(row["gini"]) == pytest.approx(inequality, abs=5e-5), world
-        assert float(row["top_decile_share"]) == pytest.approx(decile, abs=5e-5), world
+        assert int(row["heavy_customers"]) == users, world
+        assert float(row["heavy_share_of_customers"]) == pytest.approx(share, abs=5e-5), world
+        assert float(row["heavy_share_of_volume"]) == pytest.approx(volume, abs=5e-5), world
         assert float(row["frequency_difficulty_correlation"]) == pytest.approx(
             correlation, abs=5e-5
         ), world
@@ -578,20 +581,30 @@ def test_the_design_effect_of_the_concentrated_world_is_what_is_published(full: 
 
 def test_who_pays_for_the_regrouping_is_what_is_published(full: Dataset) -> None:
     published = {
-        "equal rates": (0.3352, 0.6358, 0.2197, 0.2201, 0.2201, 794),
-        "concentrated": (0.3684, 0.6205, 0.3161, 0.3265, 0.3541, 1305),
+        "equal rates": (0.3352, 0.6358, 2643, 0.3875, 0.3897, 0.3901, 794),
+        "concentrated": (0.3684, 0.6205, 2885, 0.5809, 0.5987, 0.6120, 1305),
     }
     treated, outcomes, _control = _regrouped(full)
     table = burden_table(treated, outcomes).set_index("world")
-    for world, (difficulty, resolution, volume, unresolved, hours, repeats) in published.items():
+    for world, figures in published.items():
+        difficulty, resolution, users, volume, unresolved, hours, repeats = figures
         row = table.loc[world]
         assert float(row["difficulty_per_contact"]) == pytest.approx(difficulty, abs=5e-5), world
         assert float(row["resolution_rate"]) == pytest.approx(resolution, abs=5e-5), world
-        assert float(row["top_decile_volume"]) == pytest.approx(volume, abs=5e-5), world
-        assert float(row["top_decile_unresolved"]) == pytest.approx(unresolved, abs=5e-5), world
-        assert float(row["top_decile_human_hours"]) == pytest.approx(hours, abs=5e-5), world
+        assert int(row["heavy_customers"]) == users, world
+        assert float(row["heavy_volume"]) == pytest.approx(volume, abs=5e-5), world
+        assert float(row["heavy_unresolved"]) == pytest.approx(unresolved, abs=5e-5), world
+        assert float(row["heavy_human_hours"]) == pytest.approx(hours, abs=5e-5), world
         assert int(row["customers_failed_three_times"]) == repeats, world
     control, heavy = table.loc["equal rates"], table.loc["concentrated"]
+    # The separation between volume and hours is the finding, and it is a control case in the row
+    # above: with no link between rate and difficulty the two shares are the same number.
+    assert float(control["heavy_human_hours"]) - float(control["heavy_volume"]) == pytest.approx(
+        0.003, abs=5e-4
+    )
+    assert float(heavy["heavy_human_hours"]) - float(heavy["heavy_volume"]) == pytest.approx(
+        0.031, abs=5e-4
+    )
     points = float(control["resolution_rate"]) - float(heavy["resolution_rate"])
     assert points * 100.0 == pytest.approx(1.53, abs=5e-3)
     assert float(heavy["difficulty_per_contact"]) / float(

@@ -38,7 +38,9 @@ CONCENTRATION_COLUMNS = (
     "mean_cluster_size",
     "effective_cluster_size",
     "gini",
-    "top_decile_share",
+    "heavy_customers",
+    "heavy_share_of_customers",
+    "heavy_share_of_volume",
     "frequency_difficulty_correlation",
 )
 
@@ -47,9 +49,10 @@ BURDEN_COLUMNS = (
     "world",
     "difficulty_per_contact",
     "resolution_rate",
-    "top_decile_volume",
-    "top_decile_unresolved",
-    "top_decile_human_hours",
+    "heavy_customers",
+    "heavy_volume",
+    "heavy_unresolved",
+    "heavy_human_hours",
     "customers_failed_three_times",
 )
 
@@ -63,8 +66,12 @@ PRECISION_COLUMNS = (
     "interval_width",
 )
 
-#: Share of customers, ranked by contact count, that the burden table calls the top decile.
-TOP_SHARE = 0.10
+#: Contacts in the period that make a customer a heavy user here. A **declared count**, not a
+#: decile: counts are small integers and most customers tie, so "the top tenth of customers" is not
+#: a set - which of the tied customers falls inside it depends on the order a sort happened to leave
+#: them in. A count is the same group on every machine and in every world, and it is also the way an
+#: operation would say it: somebody who contacted four times this month.
+HEAVY_CONTACTS = 4
 
 
 def gini(sizes: pd.Series | pd.Index | list[float]) -> float:
@@ -95,8 +102,35 @@ def gini(sizes: pd.Series | pd.Index | list[float]) -> float:
 
 
 def _sizes(table: pd.DataFrame) -> pd.Series:
-    """Contacts per customer, largest first."""
-    return table.groupby("customer").size().sort_values(ascending=False)
+    """Contacts per customer."""
+    return table.groupby("customer").size()
+
+
+def heavy(counts: pd.Series, minimum: int = HEAVY_CONTACTS) -> pd.Index:
+    """The customers who contacted at least ``minimum`` times.
+
+    A threshold rather than a rank, for two reasons. It is **well defined**: counts tie heavily, and
+    a rank has to break those ties by whatever order the data arrived in - the first version of this
+    module ranked, and two published figures moved between one machine and the CI runner while a
+    third, a sum over the same tied counts, did not. The defect is recorded in ``docs/ROADMAP.md``.
+    And it is **comparable**: the two worlds hold the same contacts grouped differently, so the
+    quantity of interest is how many people cross a fixed line, not who sits above a moving one.
+
+    Args:
+        counts: Contacts per customer.
+        minimum: Contacts that make a customer heavy.
+
+    Returns:
+        The index of the heavy customers.
+
+    Raises:
+        ValueError: If there are no customers, or the minimum is below one.
+    """
+    if counts.empty:
+        raise ValueError("there are no customers to threshold")
+    if minimum < 1:
+        raise ValueError(f"a heavy user has at least one contact, not {minimum}")
+    return counts.index[counts >= minimum]
 
 
 def concentration_table(contacts: Mapping[str, pd.DataFrame]) -> pd.DataFrame:
@@ -116,7 +150,7 @@ def concentration_table(contacts: Mapping[str, pd.DataFrame]) -> pd.DataFrame:
         if table.empty:
             raise ValueError(f"the {label!r} world has no contacts in it")
         sizes = _sizes(table)
-        head = max(1, int(round(TOP_SHARE * sizes.size)))
+        top = heavy(sizes)
         per_customer = table.groupby("customer")["difficulty"].mean()
         rows.append(
             {
@@ -126,7 +160,9 @@ def concentration_table(contacts: Mapping[str, pd.DataFrame]) -> pd.DataFrame:
                 "mean_cluster_size": float(sizes.mean()),
                 "effective_cluster_size": effective_cluster_size(sizes),
                 "gini": gini(sizes),
-                "top_decile_share": float(sizes.head(head).sum() / sizes.sum()),
+                "heavy_customers": int(top.size),
+                "heavy_share_of_customers": float(top.size / sizes.size),
+                "heavy_share_of_volume": float(sizes.reindex(top).sum() / sizes.sum()),
                 "frequency_difficulty_correlation": float(
                     np.corrcoef(sizes.to_numpy(dtype=float), per_customer.reindex(sizes.index))[
                         0, 1
@@ -142,6 +178,9 @@ def burden_table(
     outcomes: Mapping[str, pd.DataFrame],
 ) -> pd.DataFrame:
     """Who pays for the regrouping, and what it does to the difficulty of the volume.
+
+    The heavy group is the one :func:`heavy` defines - a declared contact count, identical in both
+    worlds - so ``heavy_customers`` is part of the result rather than a constant.
 
     Two of these columns are not invariant, and the reason is worth stating. Regrouping alone
     changes nothing per contact; correlating a customer's traits *after* regrouping does, because
@@ -170,20 +209,19 @@ def burden_table(
             contacts=("contact", "size"), failed=("failed", "sum")
         )
         per_customer["human_seconds"] = frame.groupby("customer")["human_seconds"].sum()
-        ranked = per_customer.sort_values("contacts", ascending=False)
-        head = max(1, int(round(TOP_SHARE * len(ranked))))
-        top = ranked.head(head)
+        top = per_customer.loc[heavy(per_customer["contacts"])]
         rows.append(
             {
                 "world": label,
                 "difficulty_per_contact": float(table["difficulty"].mean()),
                 "resolution_rate": float(first["resolved"].astype(float).mean()),
-                "top_decile_volume": float(top["contacts"].sum() / ranked["contacts"].sum()),
-                "top_decile_unresolved": float(top["failed"].sum() / ranked["failed"].sum()),
-                "top_decile_human_hours": float(
-                    top["human_seconds"].sum() / ranked["human_seconds"].sum()
+                "heavy_customers": int(len(top)),
+                "heavy_volume": float(top["contacts"].sum() / per_customer["contacts"].sum()),
+                "heavy_unresolved": float(top["failed"].sum() / per_customer["failed"].sum()),
+                "heavy_human_hours": float(
+                    top["human_seconds"].sum() / per_customer["human_seconds"].sum()
                 ),
-                "customers_failed_three_times": int((ranked["failed"] >= 3.0).sum()),
+                "customers_failed_three_times": int((per_customer["failed"] >= 3.0).sum()),
             }
         )
     return pd.DataFrame(rows)[list(BURDEN_COLUMNS)]

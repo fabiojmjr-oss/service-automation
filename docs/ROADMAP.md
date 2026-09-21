@@ -326,6 +326,23 @@ and I had published the invariance one wave earlier without noticing it had a bo
    comparable quantity is the relative error, which rises 66%. Caught by asking where the rise came
    from before writing it down — the one habit that has caught more defects in this repository than any
    test.
+5. **"The top decile of customers" is not a set, and two published figures moved because of it.**
+   Contact counts are small integers and most customers tie, so ranking by count and taking the top
+   tenth leaves the membership of the group to whatever order the sort happened to produce - and
+   `sort_values` is not stable by default. The shares of unresolved contacts and of human hours
+   therefore differed between this machine and the CI runner in the third decimal, while the share of
+   *volume* did not, because a sum over tied counts is the same whichever tied customers are picked.
+   **The gate caught it on the push, not before**: the fast suite compared worlds and the claims suite
+   compared numbers, and only the second one crosses machines. The group is now defined by a declared
+   contact count - four or more in the month - which is the same set everywhere, is comparable between
+   two worlds that group the same contacts differently, and is how an operation would describe it
+   anyway. The figures moved with the definition: 31.6% of volume became 58.1%, because a threshold
+   catches more people than a tenth. **Third time in this family of repositories that a figure held on
+   one machine and moved on another**, and the first where the cause was a definition rather than a
+   draw. The defect also bought a search: every ranking primitive in the package was re-read, and the
+   quality panel's sample now sorts its uniform keys stably. Two identical uniforms are vanishingly
+   unlikely, so nothing moved - but the hazard is the same one and it is cheaper to close than to
+   argue about.
 
 ## What is deliberately not here
 
