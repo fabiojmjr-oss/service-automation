@@ -344,6 +344,78 @@ and I had published the invariance one wave earlier without noticing it had a bo
    unlikely, so nothing moved - but the hazard is the same one and it is cheaper to close than to
    argue about.
 
+## Wave 6 — the contact that came back twice *(complete)*
+
+Every wave so far allowed an unresolved contact one return, and every wave named that as the reason its
+figures were an underestimate. Wave 1 wrote that a containment rate becomes a permanent queue through
+the geometric tail, and then truncated the tail at one term. This wave runs the chain.
+
+| Delivered | Where |
+| --- | --- |
+| A declared chain: attempts, a decay on returning, a lift on being resolved | `synth.ChainProfile`, `synth.CHAIN` |
+| The earlier waves' world kept as the default, so nothing published moves | `synth.SINGLE_RETURN` |
+| Two uniforms per contact per further attempt, drawn last of everything | `synth.return_draws` |
+| A session runtime that runs the chain, with the two-attempt case bit-identical | `bot.run(chain=..., draws=...)` |
+| What each attempt held, and the resolution it accumulated | `chain.attempt_table` |
+| The reopen rate, and the sessions one unresolved contact generates in closed form | `chain.reopen_rate`, `chain.sessions_per_unresolved` |
+| What truncating the tail at one return costs, across the rates an operation might have | `chain.tail_table` |
+| What the chain costs each policy | `chain.chain_table` |
+| Days to resolution, which is the third ranking of the four policies | `chain.time_table` |
+
+**The thread from wave 1.** Wave 1's finding was that containment ranks the policies in the exact
+reverse of resolution. Wave 6 adds a third ranking, **days to resolution**, which agrees with
+resolution and is steeper: `patient` takes 8.4 times as long as `human-only` to resolve a contact, and
+40.5% of what it eventually resolves is resolved on a later attempt. A rate has no time in it, and the
+customer pays in time.
+
+The result I did not expect is Result 2 of [`svclab.chain`](../src/svclab/chain/README.md). I built the
+chain expecting to find that five waves of figures had understated the queue, and the closed form says
+they understated it by **0.18%**. A contact reopens only if the customer returns *and* the human failed
+again, so the tail is a geometric series in the **product** - 0.6174 times 0.0695 here - and at a
+reopen rate of 0.0429 there is no tail to find. The geometric tail wave 1 feared is not a property of
+customers who come back. It is a property of an operation that keeps failing them: the same repeat rate
+against a human who resolves 70% instead of 93% would double the queue's own workload. That is a
+sharper and more actionable statement than the warning it replaces, and it arrived by measuring
+something I expected to confirm.
+
+Wave 3 deserves a note here rather than a defect. Its repeat feedback solved
+`load = base x (1 + repeat x abandonment(load))` by iterating to a fixed point, and iterating that map
+**is** summing the geometric series - so wave 3 was never truncating anything. The truncation lived in
+the session runtime, and the two models now agree by construction rather than by coincidence.
+
+### Defects found and recorded
+
+1. **The second attempt reused the first attempt's human draw, and that is load-bearing rather than
+   lazy.** A human who failed a contact once fails it again on the second attempt by construction,
+   because `human_resolves` is one column. Keeping that is what makes the two-attempt world identical
+   to the published one, so it stays - but it means the second attempt's resolution rate of 0.8157 is a
+   property of **who was still open**, not a fresh trial, and reading it as "a human resolves 82% of
+   returns" would be wrong. Documented in the module's limitations after I nearly quoted it that way in
+   the README.
+2. **My first chain never terminated for the hardest contacts, and the fix hid the problem.** With the
+   human draw reused at every attempt, a contact whose human failed once could never be resolved, so
+   every such contact used every attempt the chain allowed. Giving later attempts their own draw fixed
+   it; compounding the declared lift then made the probability **clip at one**, which means a long
+   enough chain here always terminates. That is now stated in `ChainProfile` and in the module's
+   limitations, because it is a property of the parameter rather than of contact centres - an operation
+   whose escalation path does not actually improve has no such guarantee, and it is the case this model
+   cannot represent.
+3. **A hand-built control case I got wrong on paper, again, and again it improved the test.** I wrote a
+   test asserting that a contact nobody can help stays unresolved through four attempts. It resolves on
+   the fourth: `reclamacao`'s human curve at difficulty 0.5 is 0.80, the lift compounds to 1.0576, and
+   that clips to certainty. The test now asserts the saturation instead, which is a better thing to
+   pin than the claim I intended - and it is the third time in this repository that recomputing a
+   control case by hand produced a more interesting fact than the one I was reaching for.
+4. **A dead constant survived the rewrite.** `MAX_REPEATS = 1` documented the truncation the chain
+   replaced, and nothing imported it except the package's own `__all__`. Removed. Coverage does not
+   catch an unused constant, which is why this one needed a grep rather than a report.
+5. **A guard for something already refused upstream, for the second time in four waves.** The helper
+   that aligns a return draw to the open contacts checked for missing draws, and `run` had already
+   refused a long chain without them - so the line could not execute. Branch coverage named it, as it
+   named wave 3's unreachable degrees-of-freedom guard. The helper now takes a frame rather than an
+   optional one and an empty stand-in covers the case that can occur, which is the same lesson twice:
+   **a guard written from imagination rather than from a path is dead code that looks like care.**
+
 ## What is deliberately not here
 
 - **No language model, and no API call to one.** The bot is a policy plus a declared response curve.
@@ -366,6 +438,19 @@ and I had published the invariance one wave earlier without noticing it had a bo
 
 ## Still open
 
+- **A return that arrives on a distribution rather than on a grid.** Every return in wave 6 lands
+  exactly one repeat window later, so days to resolution is a multiple of three days. Real returns
+  arrive the same afternoon or three weeks later, and the ordering would survive while the levels
+  gained the spread they are missing.
+- **A return the bot is allowed to attempt.** A repeat goes straight to a human here, always. A
+  deployment routes it to a bot that can see the previous conversation, which is a different policy
+  question and the one wave 6's Result 3 would move under.
+- **An escalation path that does not improve.** Wave 6's lift compounds and clips at one, so its chains
+  always end. An operation whose second line is no better than its first has an unbounded tail, and
+  that is the case the closed form in Result 2 prices and the simulation cannot reach.
+- **Churn as an outcome.** A chain that ends because the customer left looks identical here to one that
+  ends because the customer was helped. The difference is the only one the business cares about, and
+  nothing in this repository can tell them apart.
 - **More volume, not the same volume rearranged.** Wave 5 redistributes 31,802 contacts among fewer
   people, so every figure in it is the pure regrouping effect. An account whose frequent callers are
   difficult has *more* contacts than one whose are not, and that second effect is additive to
@@ -403,8 +488,6 @@ and I had published the invariance one wave earlier without noticing it had a bo
   two error rates are the same in both arms. Differential misclassification is the case that
   *exaggerates* a difference instead of hiding it, and it is the more likely failure in an operation
   where the reviewer can tell a bot transcript at a glance.
-- **Repeat chains rather than one repeat.** A customer whose second attempt also fails does come back,
-  and the geometric tail is what turns a containment rate into a permanent queue.
 - **The value the queue cannot see.** A bot that answers at three in the morning, in a channel a
   customer prefers, has a value none of these tables contain. The honest statement is that it is
   absent, not that it is zero.

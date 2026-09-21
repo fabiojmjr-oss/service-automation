@@ -12,6 +12,7 @@ their policy and by nothing else.
 
 from .config import (
     CENTRE,
+    CHAIN,
     CONCENTRATION,
     EQUAL_RATES,
     GRADERS,
@@ -21,7 +22,9 @@ from .config import (
     QUALITY,
     ROUTING,
     SEED,
+    SINGLE_RETURN,
     CentreProfile,
+    ChainProfile,
     ConcentrationProfile,
     GraderProfile,
     IntentProfile,
@@ -40,6 +43,7 @@ from .customers import CUSTOMER_COLUMNS, blend, correlated_contacts, customer_co
 from .dataset import Dataset, concentrated_dataset, correlated_dataset, generate_dataset
 from .frequency import propensity, reassign_customers
 from .quality import JUDGE_NOISE_COLUMNS, PANEL_NOISE_COLUMNS, quality_noise
+from .returns import RETURN_DRAW_COLUMNS, return_draws
 from .routing import ROUTING_SCORE_COLUMNS, accuracy_curve, routing_scores
 
 __all__ = [
@@ -48,6 +52,7 @@ __all__ = [
     "GRADERS",
     "INTENTS",
     "INTENT_TRUTH_COLUMNS",
+    "CHAIN",
     "CONCENTRATION",
     "CUSTOMER_COLUMNS",
     "EQUAL_RATES",
@@ -56,11 +61,14 @@ __all__ = [
     "POPULATION",
     "PANEL_NOISE_COLUMNS",
     "QUALITY",
+    "RETURN_DRAW_COLUMNS",
     "ROUTING",
     "ROUTING_SCORE_COLUMNS",
     "SEED",
+    "SINGLE_RETURN",
     "TRUTH_DRAW_COLUMNS",
     "CentreProfile",
+    "ChainProfile",
     "ConcentrationProfile",
     "Dataset",
     "GraderProfile",
@@ -80,5 +88,6 @@ __all__ = [
     "propensity",
     "quality_noise",
     "reassign_customers",
+    "return_draws",
     "routing_scores",
 ]

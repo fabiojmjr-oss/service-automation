@@ -403,3 +403,43 @@ CONCENTRATION = ConcentrationProfile(dispersion=0.90, difficulty_correlation=0.4
 #: cluster sizes on its own. What an estimator does with no concentration in the data is a fact
 #: about the estimator.
 EQUAL_RATES = ConcentrationProfile(dispersion=0.0, difficulty_correlation=0.0)
+
+
+@dataclass(frozen=True)
+class ChainProfile:
+    """How many times an unresolved contact comes back, and what happens when it does.
+
+    Waves 1 to 5 allow **one** repeat. A customer whose second attempt also failed did not come back
+    a third time, which every wave named as the reason its figures were an underestimate: a
+    containment rate turns into a permanent queue through the tail, and a tail truncated at one is
+    not a tail.
+
+    Three declared numbers, and the defaults reproduce the earlier waves exactly.
+
+    Attributes:
+        max_attempts: Sessions one contact may produce, the original included. Two is the earlier
+            waves' world.
+        return_decay: What the probability of coming back is multiplied by at each further attempt.
+            Below one is a customer who gives up; one is a customer who insists forever; above one
+            would be an escalating complaint and is allowed because it happens.
+        human_retry_lift: What the probability a human resolves it is multiplied by at each further
+            attempt. Above one because a case that comes back is a case somebody escalates, and a
+            chain that never resolves is a model of an operation that does not exist. It **compounds
+            and clips at one**, so a long enough chain always terminates here - which is a property
+            of this parameter and not of contact centres, and it is declared rather than discovered
+            in a figure.
+    """
+
+    max_attempts: int
+    return_decay: float
+    human_retry_lift: float
+
+
+#: The earlier waves' world, kept as the default so no published figure moves: one repeat, no decay,
+#: no lift. Passing it is the same as passing nothing.
+SINGLE_RETURN = ChainProfile(max_attempts=2, return_decay=1.0, human_retry_lift=1.0)
+
+#: Wave 6's declared chain. Four attempts, a customer who is 15% less likely to come back each time,
+#: and a human who is 15% more likely to resolve it each time - the two effects that make a real
+#: chain terminate, pulling in opposite directions on the same contact.
+CHAIN = ChainProfile(max_attempts=4, return_decay=0.85, human_retry_lift=1.15)

@@ -10,7 +10,6 @@ policies meet the same contacts and any difference between them is the policy.
 
 from .policy import GUARDED, HUMAN_ONLY, PATIENT, POLICIES, THREE_TURNS, BotPolicy
 from .session import (
-    MAX_REPEATS,
     OUTCOME_COLUMNS,
     OUTCOMES,
     REPEAT_SESSION_OFFSET,
@@ -22,7 +21,6 @@ from .session import (
 __all__ = [
     "GUARDED",
     "HUMAN_ONLY",
-    "MAX_REPEATS",
     "OUTCOMES",
     "OUTCOME_COLUMNS",
     "PATIENT",

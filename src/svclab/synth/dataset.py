@@ -7,11 +7,12 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from .config import CENTRE, CONCENTRATION, SEED, ConcentrationProfile
+from .config import CENTRE, CHAIN, CONCENTRATION, SEED, ConcentrationProfile
 from .contacts import contacts, intent_truth
 from .customers import correlated_contacts, customer_components
 from .frequency import reassign_customers
 from .quality import quality_noise
+from .returns import return_draws
 from .routing import routing_scores, scores_from
 
 
@@ -32,8 +33,12 @@ class Dataset:
             own label. Drawn after the quality noise, so adding it could not move a figure the
             earlier waves published.
         customer_components: One row per customer: the difficulty and the patience that belong to
-            the person rather than to the occasion. Drawn last, for the same reason, and unused by
-            :func:`generate_dataset`'s own world - :func:`correlated_dataset` is what consumes it.
+            the person rather than to the occasion. Drawn after the scores, for the same reason, and
+            unused by :func:`generate_dataset`'s own world - :func:`correlated_dataset` is what
+            consumes it.
+        return_draws: One row per contact and further attempt: whether the customer comes back
+            again, and whether the human resolves it that time. Drawn last of all, and spent only by
+            a run that is given a chain longer than the one repeat waves 1 to 5 allow.
     """
 
     contacts: pd.DataFrame
@@ -42,6 +47,7 @@ class Dataset:
     judge_noise: pd.DataFrame
     routing_scores: pd.DataFrame
     customer_components: pd.DataFrame
+    return_draws: pd.DataFrame
 
 
 def generate_dataset(seed: int = SEED) -> Dataset:
@@ -68,6 +74,9 @@ def generate_dataset(seed: int = SEED) -> Dataset:
     # other one, which is the only arrangement under which wave 4 could exist without moving a
     # single figure waves 1 to 3 published.
     components = customer_components(rng, CENTRE)
+    # And the chain's draws last of all, for the third time in three waves: a table drawn at the end
+    # of the stream cannot move a figure that was published before it existed.
+    chain = return_draws(rng, CENTRE, CHAIN)
     return Dataset(
         contacts=table,
         intent_truth=intent_truth(table),
@@ -75,6 +84,7 @@ def generate_dataset(seed: int = SEED) -> Dataset:
         judge_noise=judge,
         routing_scores=scores,
         customer_components=components,
+        return_draws=chain,
     )
 
 
@@ -100,6 +110,7 @@ def correlated_dataset(data: Dataset) -> Dataset:
         judge_noise=data.judge_noise,
         routing_scores=scores_from(table, data.routing_scores["u_score"].to_numpy(dtype=float)),
         customer_components=data.customer_components,
+        return_draws=data.return_draws,
     )
 
 
@@ -135,4 +146,5 @@ def concentrated_dataset(
         judge_noise=data.judge_noise,
         routing_scores=data.routing_scores,
         customer_components=data.customer_components,
+        return_draws=data.return_draws,
     )

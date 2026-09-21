@@ -226,6 +226,48 @@ clusters on its own.
   a 91% wider interval**, on the same contacts, the same arms and the same bot. A per-customer number
   is only as stable as the assumption about who a customer is.
 
+## And the contact that came back came back only once
+
+Everything above allows an unresolved contact **one** return. Every wave said so, and every wave named
+it as the reason its figures were an underestimate — wave 1 wrote that a containment rate becomes a
+permanent queue through the geometric tail, and then truncated the tail at one term. So the runtime now
+runs the chain: up to four attempts, a customer 15% less likely to return each time, a human 15% more
+likely to resolve it. The default is still one return, and `run(contacts, policy)` and
+`run(contacts, policy, chain=SINGLE_RETURN)` produce the **identical frame** — asserted by equality,
+not by tolerance.
+
+- **The chain is real and it is short.** 720 contacts need a third attempt and seven need a fourth. It
+  adds 727 sessions, **4.88% of the month's human hours**, and lifts eventual resolution from 0.8067 to
+  **0.8291** — 2.24 points five waves were not counting.
+- **Because a tail needs an operation that keeps failing.** A contact reopens only if the customer
+  returns **and** the human failed again, so the sessions one unresolved contact generates are a
+  geometric series in `r = P(return) × P(human fails)`. Here `r = 0.6174 × 0.0695 = 0.0429`, and the
+  series is **1.0448 sessions however many attempts are allowed**. Truncating at one return cost
+  **0.18%** — at a reopen rate of 0.5 it would have cost **a third**, and at 0.7 the single-return model
+  reports half the sessions that happen. **The geometric tail is not a property of customers who
+  return; it is a property of an operation that keeps failing them**, and the lever is the human's
+  first-contact resolution rather than the customer's return rate.
+- **And the chain charges the policy containment rewarded.** Extra hours rise with containment:
+  `human-only` pays +3.86%, `guarded` +4.72%, `three-turns` +4.88%, `patient` **+5.74%** — 1.5 times
+  what the human queue pays, because a policy that contains more leaves more unresolved, and an
+  unresolved contact is the only thing a chain can act on.
+- **Which produces a third ranking of the same four policies, and it is the steepest.** Days to
+  resolution: `human-only` **0.16**, `guarded` 0.52, `three-turns` 0.78, `patient` **1.31** — and
+  **40.5% of what `patient` eventually resolves is resolved on a later attempt**, against 2.6% for the
+  human queue. `patient` takes **8.4 times** as long as `human-only` and 2.5 times as long as
+  `guarded`.
+
+| Ranked best first by | Order |
+| --- | --- |
+| containment | patient, three-turns, guarded, human-only |
+| resolution | human-only, guarded, three-turns, patient |
+| **days to resolution** | human-only, guarded, three-turns, patient |
+
+**Containment is the exact reverse of both of the others.** Wave 1 said no definition of containment
+can rank resolution. Wave 6 adds that resolution is not the whole of what the customer experiences
+either: a problem fixed after two returns and three days was fixed **and** the customer waited three
+days. A rate has no time in it — and three days is not a rounding error on a KPI, it is the complaint.
+
 ## Modules
 
 | Module | What it decides |
@@ -239,6 +281,7 @@ clusters on its own.
 | [`svclab.experiment`](src/svclab/experiment/README.md) | How many contacts a test of two policies needs once customers repeat, and what significance level a test that ignores the clustering is really running at. |
 | [`svclab.population`](src/svclab/population/README.md) | What the independence assumption was worth: how much of a correlation between customers survives into the outcome a test is run on, what the surviving part costs, and what the usual correction for it costs instead. |
 | [`svclab.concentration`](src/svclab/concentration/README.md) | What grouping decides once customers do not all contact equally often: how unequal the clusters really are, which of the two cluster sizes belongs in a design effect, who pays for the failures, and how much precision a per-customer estimate loses. |
+| [`svclab.chain`](src/svclab/chain/README.md) | What a contact that comes back twice costs, how long a return chain really is and the closed form that says why, and the third ranking of the policies — days to resolution, which no rate contains. |
 
 Every module README is bilingual and carries an **Assumptions and limitations** section, because a
 figure without its assumptions is not a result.
@@ -252,6 +295,7 @@ figure without its assumptions is not a result.
 | [`examples/03_three_numbers_nobody_priced.py`](examples/03_three_numbers_nobody_priced.py) | The three defaults priced: the routing threshold swept against both objectives and against its closed form, the queue with impatience and with the repeat feedback solved to its fixed point, and what a real test of two policies costs once customers are allowed to repeat. |
 | [`examples/04_the_customer_who_was_a_label.py`](examples/04_the_customer_who_was_a_label.py) | The same account built twice from the same noise: whether the correlation moves anything already published, how much of it reaches the outcome, what it costs a comparison, how many people are failed twice, and what three different standard errors say about one difference. |
 | [`examples/05_the_frequent_caller.py`](examples/05_the_frequent_caller.py) | The identical contacts regrouped into customers who contact at different rates, with the heavy users correlated with the difficult ones: the shape of the clusters, the design effect that returns, who pays for it, and what it costs the precision of wave 1's estimate. |
+| [`examples/06_the_contact_that_came_back_twice.py`](examples/06_the_contact_that_came_back_twice.py) | The tail five waves truncated, run to its declared end: how many attempts a contact takes, the geometric series that says when that matters, what the chain costs each policy, and the ranking with time in it. |
 
 ## Install and run
 
@@ -264,12 +308,13 @@ python examples/02_the_meter_that_was_noise.py
 python examples/03_three_numbers_nobody_priced.py
 python examples/04_the_customer_who_was_a_label.py
 python examples/05_the_frequent_caller.py
+python examples/06_the_contact_that_came_back_twice.py
 ```
 
 ## How the claims are kept honest
 
-**273 tests, 100% statement and branch coverage.** 228 of them run in seconds and gate every push. The
-remaining 45 re-derive, from the generator, every figure quoted in every README on this repository,
+**306 tests, 100% statement and branch coverage.** 255 of them run in seconds and gate every push. The
+remaining 51 re-derive, from the generator, every figure quoted in every README on this repository,
 and run the example script. A change that moves a published number breaks the build instead of leaving
 the text quietly wrong.
 
@@ -294,7 +339,7 @@ position depends on how many values are asked for and not on which library versi
 is checked against the source, because a sibling repository published figures that held on one machine
 and moved on a clean install.
 
-**And defects are recorded rather than quietly fixed.** Twenty-six so far, in
+**And defects are recorded rather than quietly fixed.** Thirty-one so far, in
 [`docs/ROADMAP.md`](docs/ROADMAP.md), every one of them found by connecting the modules, by a control
 case or by verifying a sentence — none by reading code. Two are worth reading. The original session
 charged a repeat contact as extra seconds rather than as a row, which makes deflection arithmetically

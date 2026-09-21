@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from svclab.synth import CENTRE, INTENTS, CentreProfile
+from svclab.synth import CENTRE, INTENTS, SINGLE_RETURN, CentreProfile, ChainProfile
 
 from .policy import BotPolicy
 
@@ -43,17 +43,14 @@ OUTCOME_COLUMNS = (
 #: The outcomes a session can end in.
 OUTCOMES = ("resolved-by-bot", "escalated", "abandoned", "straight-to-human", "repeat-to-human")
 
-#: Repeats one unresolved contact may generate. One, declared rather than inferred: a customer whose
-#: second attempt also fails does not come back a third time here, which makes every figure in this
-#: repository an underestimate of what an automation costs the queue.
-MAX_REPEATS = 1
-
-#: What a repeat session's id is offset from its contact's id by. A constant rather than "one past
+#: What a repeat session's id is offset from its contact's id by, multiplied by the attempt. A
+#: constant rather than "one past
 #: the largest contact in this call", which is what the first version used: that made ids unique
 #: only *within* one call, so pooling the treated and control arms - which is exactly what a quality
 #: study does - produced two different sessions sharing an id. Derived from the contact id instead,
 #: so a session id is unique across any set of runs over disjoint contacts and stable whatever
-#: subset is passed in.
+#: subset is passed in. Wave 6 multiplies it by the attempt number, which keeps that property for a
+#: chain: the third attempt at contact 7 is session 2,000,007 in every run there will ever be.
 REPEAT_SESSION_OFFSET = 1_000_000
 
 #: Turns a bot needs to resolve a contact it can resolve, at difficulty zero and at difficulty one.
@@ -61,6 +58,12 @@ REPEAT_SESSION_OFFSET = 1_000_000
 #: buys anything at all.
 TURNS_AT_EASIEST = 1
 TURNS_AT_HARDEST = 5
+
+#: An empty stand-in for the return draws, so a chain that needs none does not carry an optional
+#: frame through the runtime. A two-attempt chain spends no draw, which is why it can be given none.
+NO_RETURN_DRAWS = pd.DataFrame(
+    {"contact": [], "attempt": [], "u_return": [], "u_human": []}, dtype=float
+)
 
 
 def _accuracy(difficulty: np.ndarray, which: np.ndarray) -> np.ndarray:
@@ -76,10 +79,29 @@ def _turns_needed(difficulty: np.ndarray) -> np.ndarray:
     return np.asarray(TURNS_AT_EASIEST + np.round(difficulty * span), dtype=int)
 
 
+def _human_curve(difficulty: np.ndarray, which: np.ndarray) -> np.ndarray:
+    """Probability a human resolves each contact, from the declared curve.
+
+    The same curve the contact table drew ``human_resolves`` from, recomputed here because a chain
+    needs the **probability** and not only the first draw from it. The session module is the world
+    and may read it; a policy may not, and a test enforces that.
+    """
+    ceilings = np.array([profile.human_ceiling for profile in INTENTS])[which]
+    slopes = np.array([profile.human_difficulty_slope for profile in INTENTS])[which]
+    return np.clip(ceilings - slopes * difficulty, 0.0, 1.0)
+
+
+def _repeat_curve(which: np.ndarray) -> np.ndarray:
+    """Probability an unresolved contact of each intent comes back, from the declared curve."""
+    return np.array([profile.repeat_when_unresolved for profile in INTENTS])[which]
+
+
 def run(
     contacts: pd.DataFrame,
     policy: BotPolicy,
     centre: CentreProfile = CENTRE,
+    chain: ChainProfile = SINGLE_RETURN,
+    draws: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Run one policy against every contact.
 
@@ -102,18 +124,32 @@ def run(
        same handling time again plus the handoff. Collapsing it into extra seconds on the original
        row, which is what the first version of this module did, makes deflection arithmetically
        identical to containment and hides the whole finding.
+    7. And a contact still unresolved after that comes back **again**, as many times as the declared
+       chain allows. The default allows one return and no more, which is the world waves 1 to 5
+       published - passing it changes nothing at all, by identity rather than by tolerance.
 
     Args:
         contacts: The contact table from :func:`svclab.synth.contacts`.
         policy: The policy to run.
         centre: The centre's declared shape, for the per-turn and handoff costs.
+        chain: How many times an unresolved contact returns, and what changes when it does. The
+            default is the single return of waves 1 to 5.
+        draws: The uniforms a longer chain needs, from :func:`svclab.synth.return_draws`. Required
+            for a chain of more than two attempts, and unused by the default.
 
     Returns:
         A frame with the columns in :data:`OUTCOME_COLUMNS`.
 
     Raises:
         KeyError: If the contact table is missing a column the session needs.
+        ValueError: If a chain longer than one return is asked for without the draws it needs.
     """
+    if chain.max_attempts > 2 and draws is None:
+        raise ValueError(
+            f"a chain of {chain.max_attempts} attempts needs the return draws; pass "
+            f"`draws=data.return_draws`"
+        )
+    given = draws if draws is not None else NO_RETURN_DRAWS
     missing = {
         "contact",
         "customer",
@@ -214,35 +250,91 @@ def run(
             "customer_seconds": bot_turns * centre.bot_seconds_per_turn,
         }
     )
-    if not returns.any():
+    if not returns.any() or chain.max_attempts < 2:
         return first[list(OUTCOME_COLUMNS)]
-
-    # The repeat stream, as rows. A repeat's session id is its contact's id plus a fixed offset, so
-    # one column identifies a session across any set of runs while `contact` keeps the repeat
-    # joinable to what caused it.
-    back = contacts[returns]
     if int(contacts["contact"].max()) >= REPEAT_SESSION_OFFSET:
         raise ValueError(
             f"contact ids reach {int(contacts['contact'].max())}, which collides with the repeat "
             f"session offset of {REPEAT_SESSION_OFFSET}"
         )
-    again = pd.DataFrame(
-        {
-            "session": back["contact"].to_numpy(dtype=int) + REPEAT_SESSION_OFFSET,
-            "contact": back["contact"].to_numpy(),
-            "customer": back["customer"].to_numpy(),
-            "intent": back["intent"].to_numpy(),
-            "predicted_intent": back["intent"].to_numpy(),
-            "classified_correctly": np.ones(len(back), dtype=bool),
-            "route": np.repeat("repeat", len(back)),
-            "bot_turns": np.zeros(len(back), dtype=int),
-            "outcome": np.repeat("repeat-to-human", len(back)),
-            "handled_by_human": np.ones(len(back), dtype=bool),
-            "resolved": back["human_resolves"].to_numpy(dtype=bool),
-            "is_repeat": np.ones(len(back), dtype=bool),
-            "returns": np.zeros(len(back), dtype=bool),
-            "human_seconds": back["human_seconds"].to_numpy(dtype=float) + centre.handoff_seconds,
-            "customer_seconds": np.zeros(len(back), dtype=float),
-        }
-    )
-    return pd.concat([first, again], ignore_index=True)[list(OUTCOME_COLUMNS)]
+
+    # The return stream, as rows, one attempt at a time. A session id is its contact's id plus the
+    # offset times the attempt, so one column identifies a session across any set of runs while
+    # `contact` keeps every return joinable to what caused it.
+    #
+    # The second attempt uses the draws the contact table already carries - `human_resolves` and
+    # `repeats_if_unresolved` - so a chain of two attempts is bit-for-bit the world waves 1 to 5
+    # published. Every attempt after that needs its own coin, because a human who failed once has to
+    # be allowed to succeed the next time: reusing the first draw would make a chain that starts
+    # badly never end, which is a model of an operation nobody has.
+    frames = [first]
+    open_rows = contacts[returns]
+    open_index = np.flatnonzero(returns)
+    for attempt in range(2, chain.max_attempts + 1):
+        if open_rows.empty:
+            break
+        seconds = open_rows["human_seconds"].to_numpy(dtype=float) + centre.handoff_seconds
+        if attempt == 2:
+            resolved_now = open_rows["human_resolves"].to_numpy(dtype=bool)
+        else:
+            lift = chain.human_retry_lift ** (attempt - 2)
+            chance = np.clip(
+                _human_curve(difficulty[open_index], which[open_index]) * lift, 0.0, 1.0
+            )
+            resolved_now = _attempt_draw(given, attempt, open_rows, "u_human") < chance
+        # Whether each still-unresolved contact comes back once more. The declared decay applies
+        # from the third attempt on: the second is the one the earlier waves already drew.
+        if attempt >= chain.max_attempts:
+            again = np.zeros(len(open_rows), dtype=bool)
+        else:
+            decay = chain.return_decay ** (attempt - 1)
+            chance = np.clip(_repeat_curve(which[open_index]) * decay, 0.0, 1.0)
+            again = (
+                ~resolved_now
+                & (_attempt_draw(given, attempt + 1, open_rows, "u_return") < chance)
+                & ~open_rows["would_self_serve"].to_numpy(dtype=bool)
+            )
+        frames.append(
+            pd.DataFrame(
+                {
+                    "session": open_rows["contact"].to_numpy(dtype=int)
+                    + REPEAT_SESSION_OFFSET * (attempt - 1),
+                    "contact": open_rows["contact"].to_numpy(),
+                    "customer": open_rows["customer"].to_numpy(),
+                    "intent": open_rows["intent"].to_numpy(),
+                    "predicted_intent": open_rows["intent"].to_numpy(),
+                    "classified_correctly": np.ones(len(open_rows), dtype=bool),
+                    "route": np.repeat("repeat", len(open_rows)),
+                    "bot_turns": np.zeros(len(open_rows), dtype=int),
+                    "outcome": np.repeat("repeat-to-human", len(open_rows)),
+                    "handled_by_human": np.ones(len(open_rows), dtype=bool),
+                    "resolved": resolved_now,
+                    "is_repeat": np.ones(len(open_rows), dtype=bool),
+                    "returns": again,
+                    "human_seconds": seconds,
+                    "customer_seconds": np.zeros(len(open_rows), dtype=float),
+                }
+            )
+        )
+        open_index = open_index[again]
+        open_rows = open_rows[again]
+    return pd.concat(frames, ignore_index=True)[list(OUTCOME_COLUMNS)]
+
+
+def _attempt_draw(draws: pd.DataFrame, attempt: int, rows: pd.DataFrame, column: str) -> np.ndarray:
+    """One column of the return draws, for one attempt, aligned to the open contacts.
+
+    Takes a frame rather than an optional one: :func:`run` refuses a long chain without draws before
+    it gets here, so a second guard for the same thing was unreachable - the coverage report said so
+    and it is recorded in ``docs/ROADMAP.md``. An empty frame still arrives when a two-attempt chain
+    is given none, and the alignment check below is what catches anything the caller got wrong.
+
+    Raises:
+        ValueError: If the draws do not cover this attempt, which is a chain asking for a coin that
+        was never flipped rather than a missing value to guess at.
+    """
+    slice_ = draws[draws["attempt"] == attempt].set_index("contact")[column]
+    aligned = slice_.reindex(rows["contact"].to_numpy())
+    if aligned.isna().any():
+        raise ValueError(f"the return draws do not cover attempt {attempt} for every open contact")
+    return aligned.to_numpy(dtype=float)

@@ -27,6 +27,14 @@ from svclab.capacity import (
     occupancy,
     service_level,
 )
+from svclab.chain import (
+    attempt_table,
+    chain_table,
+    reopen_rate,
+    sessions_per_unresolved,
+    tail_table,
+    time_table,
+)
 from svclab.concentration import burden_table, concentration_table, precision_table
 from svclab.containment import containment_table, deflection, selection_profile
 from svclab.experiment import intracluster_correlation, sizing_table
@@ -52,10 +60,13 @@ from svclab.quality import (
 from svclab.routing import best_by, calibrated_threshold, cost_curve, cost_of, defer_below
 from svclab.synth import (
     CENTRE,
+    CHAIN,
     EQUAL_RATES,
+    INTENTS,
     POPULATION,
     QUALITY,
     ROUTING,
+    SINGLE_RETURN,
     Dataset,
     concentrated_dataset,
     correlated_dataset,
@@ -635,6 +646,132 @@ def test_the_precision_of_the_business_cases_estimate_is_what_is_published(full:
     assert float(table.loc["concentrated", "interval_width"]) / float(
         table.loc["equal rates", "interval_width"]
     ) - 1.0 == pytest.approx(0.91, abs=5e-3)
+
+
+# --- svclab.chain -------------------------------------------------------------------------------
+
+
+def _chained(full: Dataset) -> tuple[dict[str, pd.DataFrame], dict[str, pd.DataFrame]]:
+    """Every policy on the treated arm, with one return and with the declared chain."""
+    treated = full.contacts[~full.contacts["holdout"]]
+    single = {policy.name: run(treated, policy) for policy in POLICIES}
+    chained = {
+        policy.name: run(treated, policy, chain=CHAIN, draws=full.return_draws)
+        for policy in POLICIES
+    }
+    return single, chained
+
+
+def test_the_default_chain_leaves_every_published_session_where_it_was(full: Dataset) -> None:
+    """The identity the whole wave rests on, asserted here as well as in the unit tests."""
+    treated = full.contacts[~full.contacts["holdout"]]
+    plain = run(treated, THREE_TURNS)
+    declared = run(treated, THREE_TURNS, chain=SINGLE_RETURN)
+    assert len(plain) == len(declared)
+    assert plain.equals(declared)
+
+
+def test_the_attempts_of_the_chain_are_what_is_published(full: Dataset) -> None:
+    published = {
+        1: (31802, 20210, 0.6355, 0.6355, 1762.19),
+        2: (6674, 5444, 0.8157, 0.8067, 968.24),
+        3: (720, 705, 0.9792, 0.8288, 131.95),
+        4: (7, 7, 1.0000, 0.8291, 1.18),
+    }
+    treated = full.contacts[~full.contacts["holdout"]]
+    _single, chained = _chained(full)
+    table = attempt_table(chained["three-turns"], len(treated)).set_index("attempt")
+    for attempt, (sessions, resolved, rate, cumulative, hours) in published.items():
+        row = table.loc[attempt]
+        assert int(row["sessions"]) == sessions, attempt
+        assert int(row["resolved"]) == resolved, attempt
+        assert float(row["resolution_rate"]) == pytest.approx(rate, abs=5e-5), attempt
+        assert float(row["cumulative_resolution"]) == pytest.approx(cumulative, abs=5e-5), attempt
+        assert float(row["human_hours"]) == pytest.approx(hours, abs=5e-3), attempt
+
+
+def test_the_reopen_rate_and_its_series_are_what_is_published(full: Dataset) -> None:
+    treated = full.contacts[~full.contacts["holdout"]]
+    repeat = sum(profile.repeat_when_unresolved * profile.share for profile in INTENTS)
+    resolution = float(treated["human_resolves"].mean())
+    assert repeat == pytest.approx(0.6174, abs=5e-5)
+    assert resolution == pytest.approx(0.9305, abs=5e-5)
+    rate = reopen_rate(repeat, resolution)
+    assert rate == pytest.approx(0.0429, abs=5e-5)
+    assert sessions_per_unresolved(rate, CHAIN.max_attempts) == pytest.approx(1.0448, abs=5e-5)
+    published = {
+        0.05: (1.0500, 1.0526, 1.0526, 0.0025),
+        0.10: (1.1000, 1.1110, 1.1111, 0.0101),
+        0.20: (1.2000, 1.2480, 1.2500, 0.0417),
+        0.30: (1.3000, 1.4170, 1.4286, 0.0989),
+        0.50: (1.5000, 1.8750, 2.0000, 0.3333),
+        0.70: (1.7000, 2.5330, 3.3333, 0.9608),
+    }
+    table = tail_table(tuple(published) + (round(rate, 4),)).set_index("reopen_rate")
+    for value, (two, four, unbounded, error) in published.items():
+        row = table.loc[value]
+        assert float(row["two_attempts"]) == pytest.approx(two, abs=5e-5), value
+        assert float(row["four_attempts"]) == pytest.approx(four, abs=5e-5), value
+        assert float(row["unbounded"]) == pytest.approx(unbounded, abs=5e-5), value
+        assert float(row["truncation_error"]) == pytest.approx(error, abs=5e-5), value
+    assert float(table.loc[round(rate, 4), "truncation_error"]) == pytest.approx(0.0018, abs=5e-5)
+
+
+def test_what_the_chain_costs_each_policy_is_what_is_published(full: Dataset) -> None:
+    published = {
+        "human-only": (33989, 1.0688, 0.9305, 0.9552, 3786.22, 799, 0.0386),
+        "guarded": (37025, 1.1642, 0.7271, 0.8515, 2996.57, 738, 0.0472),
+        "three-turns": (39203, 1.2327, 0.6355, 0.8291, 2863.56, 727, 0.0488),
+        "patient": (42741, 1.3440, 0.4476, 0.7526, 2449.82, 726, 0.0574),
+    }
+    single, chained = _chained(full)
+    table = chain_table(single, chained).set_index("policy")
+    for policy, figures in published.items():
+        sessions, per_contact, first, eventual, hours, extra, share = figures
+        row = table.loc[policy]
+        assert int(row["sessions"]) == sessions, policy
+        assert float(row["sessions_per_contact"]) == pytest.approx(per_contact, abs=5e-5), policy
+        assert float(row["first_attempt_resolution"]) == pytest.approx(first, abs=5e-5), policy
+        assert float(row["eventual_resolution"]) == pytest.approx(eventual, abs=5e-5), policy
+        assert float(row["human_hours"]) == pytest.approx(hours, abs=5e-3), policy
+        assert int(row["extra_sessions"]) == extra, policy
+        assert float(row["extra_hours_share"]) == pytest.approx(share, abs=5e-5), policy
+    # The ordering the wave turns on: the extra cost rises with containment.
+    assert float(table.loc["patient", "extra_hours_share"]) / float(
+        table.loc["human-only", "extra_hours_share"]
+    ) == pytest.approx(1.5, abs=0.05)
+
+
+def test_the_time_to_resolution_is_what_is_published(full: Dataset) -> None:
+    published = {
+        "human-only": (0.0000, 0.9552, 3.73, 0.1555, 0.0258, 0.0258),
+        "guarded": (0.4886, 0.8515, 12.46, 0.5193, 0.1461, 0.0267),
+        "three-turns": (0.6065, 0.8291, 18.77, 0.7823, 0.2335, 0.0270),
+        "patient": (0.8169, 0.7526, 31.34, 1.3057, 0.4052, 0.0297),
+    }
+    _single, chained = _chained(full)
+    table = time_table(chained).set_index("policy")
+    for policy, figures in published.items():
+        containment, eventual, hours, days, beyond_first, beyond_second = figures
+        row = table.loc[policy]
+        assert float(row["containment"]) == pytest.approx(containment, abs=5e-5), policy
+        assert float(row["eventual_resolution"]) == pytest.approx(eventual, abs=5e-5), policy
+        assert float(row["hours_to_resolution"]) == pytest.approx(hours, abs=5e-3), policy
+        assert float(row["days_to_resolution"]) == pytest.approx(days, abs=5e-5), policy
+        assert float(row["share_beyond_first"]) == pytest.approx(beyond_first, abs=5e-5), policy
+        assert float(row["share_beyond_second"]) == pytest.approx(beyond_second, abs=5e-5), policy
+    slow = float(table.loc["patient", "days_to_resolution"])
+    assert slow / float(table.loc["human-only", "days_to_resolution"]) == pytest.approx(
+        8.4, abs=0.05
+    )
+    assert slow / float(table.loc["guarded", "days_to_resolution"]) == pytest.approx(2.5, abs=0.05)
+    # And the three rankings, which is the claim the root README makes.
+    by = lambda column, ascending: (  # noqa: E731
+        table.sort_values(column, ascending=ascending).index.tolist()
+    )
+    assert by("containment", False) == ["patient", "three-turns", "guarded", "human-only"]
+    assert by("eventual_resolution", False) == ["human-only", "guarded", "three-turns", "patient"]
+    assert by("days_to_resolution", True) == ["human-only", "guarded", "three-turns", "patient"]
 
 
 # --- The example -------------------------------------------------------------------------------

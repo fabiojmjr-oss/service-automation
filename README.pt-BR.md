@@ -226,6 +226,48 @@ os grupos por si só.
   mais largo**, sobre os mesmos contatos, os mesmos braços e o mesmo bot. Um número por cliente só é
   tão estável quanto a premissa sobre o que é um cliente.
 
+## E o contato que voltou voltou só uma vez
+
+Tudo acima permite **um** retorno a um contato não resolvido. Toda onda disse isso, e toda onda apontou
+o fato como a razão de suas cifras serem subestimativas — a onda 1 escreveu que uma taxa de contenção se
+torna uma fila permanente pela cauda geométrica, e então truncou a cauda em um termo. Agora o runtime
+roda a cadeia: até quatro tentativas, um cliente 15% menos propenso a voltar a cada vez, um humano 15%
+mais propenso a resolver. O padrão continua sendo um retorno, e `run(contacts, policy)` e
+`run(contacts, policy, chain=SINGLE_RETURN)` produzem o **frame idêntico** — verificado por igualdade,
+não por tolerância.
+
+- **A cadeia é real e é curta.** 720 contatos precisam de uma terceira tentativa e sete de uma quarta.
+  Ela acrescenta 727 sessões, **4,88% das horas humanas do mês**, e leva a resolução eventual de 0,8067
+  para **0,8291** — 2,24 pontos que cinco ondas não contavam.
+- **Porque uma cauda exige uma operação que segue falhando.** Um contato reabre só se o cliente volta
+  **e** o humano falhou de novo, então as sessões que um contato não resolvido gera são uma série
+  geométrica em `r = P(volta) × P(humano falha)`. Aqui `r = 0,6174 × 0,0695 = 0,0429`, e a série dá
+  **1,0448 sessões por mais tentativas que se permitam**. Truncar em um retorno custou **0,18%** — a uma
+  taxa de reabertura de 0,5 teria custado **um terço**, e a 0,7 o modelo de retorno único reporta metade
+  das sessões que acontecem. **A cauda geométrica não é propriedade de clientes que voltam; é
+  propriedade de uma operação que segue falhando com eles** — e a alavanca é a resolução no primeiro
+  contato pelo humano, não a taxa de retorno do cliente.
+- **E a cadeia cobra da política que a contenção premiava.** As horas extra crescem com a contenção:
+  `human-only` paga +3,86%, `guarded` +4,72%, `three-turns` +4,88%, `patient` **+5,74%** — 1,5 vez o que
+  a fila humana paga, porque uma política que contém mais deixa mais coisa não resolvida, e um contato
+  não resolvido é a única coisa sobre a qual uma cadeia pode agir.
+- **O que produz um terceiro ranking das mesmas quatro políticas, e é o mais inclinado.** Dias até
+  resolver: `human-only` **0,16**, `guarded` 0,52, `three-turns` 0,78, `patient` **1,31** — e **40,5% do
+  que a `patient` eventualmente resolve é resolvido numa tentativa posterior**, contra 2,6% na fila
+  humana. A `patient` leva **8,4 vezes** o tempo da `human-only` e 2,5 vezes o da `guarded`.
+
+| Ordenado do melhor por | Ordem |
+| --- | --- |
+| contenção | patient, three-turns, guarded, human-only |
+| resolução | human-only, guarded, three-turns, patient |
+| **dias até resolver** | human-only, guarded, three-turns, patient |
+
+**A contenção é o inverso exato dos outros dois.** A onda 1 dizia que nenhuma definição de contenção
+pode ordenar resolução. A onda 6 acrescenta que resolução também não é tudo o que o cliente
+experimenta: um problema resolvido depois de dois retornos e três dias foi resolvido **e** o cliente
+esperou três dias. Uma taxa não tem tempo dentro — e três dias não são erro de arredondamento num KPI,
+são a reclamação.
+
 ## Módulos
 
 | Módulo | O que decide |
@@ -239,6 +281,7 @@ os grupos por si só.
 | [`svclab.experiment`](src/svclab/experiment/README.md) | Quantos contatos um teste de duas políticas precisa quando clientes repetem, e a qual nível de significância um teste que ignora o agrupamento roda de fato. |
 | [`svclab.population`](src/svclab/population/README.md) | Quanto valia a premissa de independência: quanto de uma correlação entre clientes sobrevive até o desfecho em que um teste roda, o que a parte sobrevivente custa, e o que custa a correção usual para ela. |
 | [`svclab.concentration`](src/svclab/concentration/README.md) | O que o agrupamento decide quando os clientes não contatam todos igualmente: quão desiguais os grupos realmente são, qual dos dois tamanhos de grupo entra num efeito de desenho, quem paga pelas falhas, e quanta precisão uma estimativa por cliente perde. |
+| [`svclab.chain`](src/svclab/chain/README.md) | O que custa um contato que volta duas vezes, quão longa é de fato uma cadeia de retornos e a forma fechada que diz por quê, e o terceiro ranking das políticas — dias até resolver, que nenhuma taxa contém. |
 
 Todo README de módulo é bilíngue e traz uma seção **Premissas e limitações**, porque uma cifra sem suas
 premissas não é um resultado.
@@ -252,6 +295,7 @@ premissas não é um resultado.
 | [`examples/03_three_numbers_nobody_priced.py`](examples/03_three_numbers_nobody_priced.py) | Os três padrões precificados: o limiar de roteamento varrido contra os dois objetivos e contra sua forma fechada, a fila com impaciência e com a realimentação de repetições resolvida até o ponto fixo, e o que custa um teste real de duas políticas quando clientes podem repetir. |
 | [`examples/04_the_customer_who_was_a_label.py`](examples/04_the_customer_who_was_a_label.py) | A mesma conta construída duas vezes a partir do mesmo ruído: se a correlação move algo já publicado, quanto dela chega ao desfecho, o que custa a uma comparação, quantas pessoas são falhadas duas vezes, e o que três erros padrão diferentes dizem sobre uma mesma diferença. |
 | [`examples/05_the_frequent_caller.py`](examples/05_the_frequent_caller.py) | Os mesmos contatos reagrupados em clientes que contatam em taxas diferentes, com os pesados correlacionados aos difíceis: a forma dos grupos, o efeito de desenho que retorna, quem paga por ele, e o que custa à precisão da estimativa da onda 1. |
+| [`examples/06_the_contact_that_came_back_twice.py`](examples/06_the_contact_that_came_back_twice.py) | A cauda que cinco ondas truncaram, rodada até seu fim declarado: quantas tentativas um contato leva, a série geométrica que diz quando isso importa, o que a cadeia custa a cada política, e o ranking que tem tempo dentro. |
 
 ## Instalar e rodar
 
@@ -264,12 +308,13 @@ python examples/02_the_meter_that_was_noise.py
 python examples/03_three_numbers_nobody_priced.py
 python examples/04_the_customer_who_was_a_label.py
 python examples/05_the_frequent_caller.py
+python examples/06_the_contact_that_came_back_twice.py
 ```
 
 ## Como as afirmações são mantidas honestas
 
-**273 testes, 100% de cobertura de linhas e de ramos.** 228 deles rodam em segundos e liberam cada push.
-Os 45 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
+**306 testes, 100% de cobertura de linhas e de ramos.** 255 deles rodam em segundos e liberam cada push.
+Os 51 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
 rodam o script de exemplo. Uma mudança que mova um número publicado quebra o build em vez de deixar o
 texto silenciosamente errado.
 
@@ -294,7 +339,7 @@ modo que a posição no stream depende de quantos valores são pedidos e não de
 responde. Essa regra é verificada contra o código-fonte, porque um repositório irmão publicou cifras
 que valiam numa máquina e mudavam numa instalação limpa.
 
-**E defeitos são registrados em vez de corrigidos em silêncio.** Vinte e seis até aqui, em
+**E defeitos são registrados em vez de corrigidos em silêncio.** Trinta e um até aqui, em
 [`docs/ROADMAP.md`](docs/ROADMAP.md), cada um deles achado conectando os módulos, por um caso de
 controle ou verificando uma frase — nenhum lendo código. Dois valem a leitura. A sessão original cobrava
 um recontato como segundos extras em vez de como uma linha, o que torna o desvio aritmeticamente

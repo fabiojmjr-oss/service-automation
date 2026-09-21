@@ -50,6 +50,12 @@ with the customer's own difficulty at a declared 0.40, and the account exists in
 where every customer contacts at the same rate. No real account's concentration is measured or claimed
 anywhere: what is shown is what a declared concentration does to a measurement.
 
+And from wave 6 **how many times** an unresolved contact comes back is invented, along with what
+changes when it does: four attempts, a customer 15% less likely to return each time and a human 15%
+more likely to resolve it. The single return of waves 1 to 5 is kept as the default, so the published
+figures are the ones that world produced. No real account's return chain is measured or claimed
+anywhere.
+
 Everything in the generator was designed to make a particular measurement situation visible — one
 contact reason that is mostly answerable and mostly self-serving, one that is neither, a residue whose
 handling time rises with difficulty, a repeat stream that an unresolved conversation produces, and a
@@ -117,6 +123,12 @@ entre contatar muito e ser difícil. A taxa é log-normal com dispersão declara
 dificuldade do próprio cliente a um declarado 0,40, e a conta existe numa versão de controle em que
 todo cliente contata na mesma taxa. A concentração de nenhuma conta real é medida ou afirmada em lugar
 algum: o que se mostra é o que uma concentração declarada faz a uma medição.
+
+E a partir da onda 6 **quantas vezes** um contato não resolvido volta é inventado, junto com o que muda
+quando ele volta: quatro tentativas, um cliente 15% menos propenso a retornar a cada vez e um humano 15%
+mais propenso a resolver. O retorno único das ondas 1 a 5 é mantido como padrão, então as cifras
+publicadas são as que aquele mundo produziu. A cadeia de retornos de nenhuma conta real é medida ou
+afirmada em lugar algum.
 
 Tudo no gerador foi desenhado para tornar visível uma situação de medição específica — uma razão de
 contato em boa parte respondível e em boa parte autorresolvível, uma que não é nem uma coisa nem outra,
