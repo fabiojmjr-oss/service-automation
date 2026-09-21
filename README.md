@@ -104,6 +104,43 @@ quality rubric.
   a **committee** beats the judge, 0.7979 against 0.7826 — averaging three moderate assessors recovers
   most of what each one loses, which is an argument for a panel and not for any member of it.
 
+## And three numbers the first two waves never priced
+
+Wave 1's `guarded` policy refused two intents on the strength of a label and never asked what the label
+was worth. Every capacity figure above assumes nobody gives up waiting. And both waves compared
+policies on the whole account, as though contacts were independent. Three decisions taken by default,
+priced:
+
+- **Tuning the router's threshold on accuracy rather than on cost costs 7.51 human hours a month.** The
+  accuracy-maximising cut is 0.45 and the cost-minimising one is 0.48 — three hundredths, 0.8506 seconds
+  per contact, across 31,802 contacts. Sweeping one threshold per intent instead of one for all five
+  saves a further **11.5552 seconds per contact**: 102.1 hours over the same month, because a single
+  threshold is a compromise between five intents that wanted very different answers.
+- **And the closed form for that threshold, applied to this score, is 12.5% worse than the single number
+  it was meant to improve on.** Deferring below `1 − defer_cost / misroute_cost` is exactly optimal on a
+  score that *is* the probability the label is right. This score is a margin, so the formula's
+  **ranking** of the five intents survives intact and its **levels** do not — it defers 23,304 of 31,802
+  contacts to avoid 2,414 misroutes. Calibration is the missing step, and the formula assumes it
+  silently.
+- **The promised headcount is reachable, if 29% of the customers give up.** Erlang C has nothing to say
+  below eight agents at this load: the queue grows without bound, and the service level is reported as
+  zero because there is no wait to report. Erlang A does have an answer — at **six** agents the queue is
+  perfectly stable, with **29.23% abandonment** and the remaining agents at **89.45% occupancy**. The
+  business case's 5.51 agents was never impossible. It was an unstated decision to answer seven contacts
+  in ten.
+- **And an understaffed queue manufactures its own extra work.** Abandoned contacts come back and the
+  return is load, so the settled load is a fixed point: 9.1886 erlangs against a base of 7.5845, which
+  is **+21.1% of load and abandonment rising from 29.23% to 38.45%**. At eleven agents the identical
+  feedback adds 2.0% and settles at 3.56% — a rounding error at adequate staffing, which is the case for
+  the eleven agents stated in the currency the abandonment is paid in.
+- **A test of two policies that believes it runs at five per cent is really running at 8.43%.** Customers
+  repeat, so contacts are clustered, and a per-contact test divides by a standard error too small by the
+  square root of the design effect. Detecting wave 1's 0.0916 gap takes 405 contacts per arm if contacts
+  are independent and **523** at a correlation of 0.30. The honest half of this result: **this
+  generator's own measured correlation is approximately zero**, because every trait is drawn per
+  contact. That is a limitation of the simulator, published as one — the scenarios above are declared
+  correlations, not measured ones.
+
 ## Modules
 
 | Module | What it decides |
@@ -113,6 +150,8 @@ quality rubric.
 | [`svclab.containment`](src/svclab/containment/README.md) | Which containment number is being shown, out of the four that are all correct; how much of it reached the queue, against customers who never met the bot; and which contacts the bot kept. |
 | [`svclab.capacity`](src/svclab/capacity/README.md) | How many agents the queue needs at its service level, how many the containment rate promised, and where the difference came from. |
 | [`svclab.quality`](src/svclab/quality/README.md) | Whether the quality score is a measurement or a habit, how much of a real difference this panel will report, and what an unqualified gauge costs in sessions. |
+| [`svclab.routing`](src/svclab/routing/README.md) | Where to cut the classifier's score when the two mistakes cost different numbers of human seconds, what the closed form for that cut assumes about the score, and which objective the cut is being tuned on. |
+| [`svclab.experiment`](src/svclab/experiment/README.md) | How many contacts a test of two policies needs once customers repeat, and what significance level a test that ignores the clustering is really running at. |
 
 Every module README is bilingual and carries an **Assumptions and limitations** section, because a
 figure without its assumptions is not a result.
@@ -123,6 +162,7 @@ figure without its assumptions is not a result.
 | --- | --- |
 | [`examples/01_the_containment_that_wasnt.py`](examples/01_the_containment_that_wasnt.py) | Four policies on one account: the four containment rates and the ranking each produces, which contacts the bot kept, what the queue actually received against what was claimed, and the headcount case decomposed into its three errors. |
 | [`examples/02_the_meter_that_was_noise.py`](examples/02_the_meter_that_was_noise.py) | The gauge study run before the comparison: repeatability, reproducibility, bias against a declared standard, the exact factor by which the panel shrinks every difference, what that costs in sessions, and what an automated judge would be validated against. |
+| [`examples/03_three_numbers_nobody_priced.py`](examples/03_three_numbers_nobody_priced.py) | The three defaults priced: the routing threshold swept against both objectives and against its closed form, the queue with impatience and with the repeat feedback solved to its fixed point, and what a real test of two policies costs once customers are allowed to repeat. |
 
 ## Install and run
 
@@ -132,12 +172,13 @@ make check       # lint, types and the fast suite - what gates a push
 make check-all   # the above plus every documented figure re-derived
 python examples/01_the_containment_that_wasnt.py
 python examples/02_the_meter_that_was_noise.py
+python examples/03_three_numbers_nobody_priced.py
 ```
 
 ## How the claims are kept honest
 
-**152 tests, 100% statement and branch coverage.** 129 of them run in seconds and gate every push. The
-remaining 23 re-derive, from the generator, every figure quoted in every README on this repository,
+**216 tests, 100% statement and branch coverage.** 183 of them run in seconds and gate every push. The
+remaining 33 re-derive, from the generator, every figure quoted in every README on this repository,
 and run the example script. A change that moves a published number breaks the build instead of leaving
 the text quietly wrong.
 
@@ -162,7 +203,7 @@ position depends on how many values are asked for and not on which library versi
 is checked against the source, because a sibling repository published figures that held on one machine
 and moved on a clean install.
 
-**And defects are recorded rather than quietly fixed.** Nine so far, in
+**And defects are recorded rather than quietly fixed.** Fourteen so far, in
 [`docs/ROADMAP.md`](docs/ROADMAP.md), every one of them found by connecting the modules, by a control
 case or by verifying a sentence — none by reading code. Two are worth reading. The original session
 charged a repeat contact as extra seconds rather than as a row, which makes deflection arithmetically

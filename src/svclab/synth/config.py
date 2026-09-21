@@ -285,3 +285,39 @@ QUALITY = QualityProfile(
     abandoned=0.15,
     difficulty_penalty=0.30,
 )
+
+
+@dataclass(frozen=True)
+class RoutingProfile:
+    """The confidence a routing classifier attaches to its own label, and what a mistake costs.
+
+    Attributes:
+        score_noise_sd: Spread added to the classifier's margin before it becomes a score. Zero
+            would make the score a perfect ranker of its own correctness, which no classifier is.
+        misroute_seconds: Extra human seconds a contact costs when the bot was handed it on a wrong
+            label, by intent. A complaint read as a tracking question is not the same mistake as the
+            reverse, and a single accuracy figure cannot express that.
+        defer_seconds: Extra human seconds a deferred contact costs - the classifier declined to
+            let the bot try, so a human takes it fresh. Small, and not zero: somebody still reads
+            the queue entry.
+    """
+
+    score_noise_sd: float
+    misroute_seconds: dict[str, float]
+    defer_seconds: float
+
+
+#: The cost asymmetry is the whole point of the module that reads this. Misrouting a complaint costs
+#: nine minutes of a human's day plus a customer who has now explained a problem to a machine that
+#: answered about parcel tracking; misrouting a tracking question costs a minute.
+ROUTING = RoutingProfile(
+    score_noise_sd=0.12,
+    misroute_seconds={
+        "rastreio": 60.0,
+        "prazo-de-entrega": 90.0,
+        "cadastro": 150.0,
+        "reembolso": 420.0,
+        "reclamacao": 540.0,
+    },
+    defer_seconds=20.0,
+)

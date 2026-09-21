@@ -104,6 +104,43 @@ inédito para uma régua de qualidade.
   contra 0,7826 — fazer a média de três avaliadores moderados recupera a maior parte do que cada um
   perde, o que é argumento a favor de um painel e não de nenhum de seus membros.
 
+## E três números que as duas primeiras ondas nunca precificaram
+
+A política `guarded` da onda 1 recusou dois intents com base num rótulo e nunca perguntou quanto valia o
+rótulo. Toda cifra de capacidade acima assume que ninguém desiste de esperar. E as duas ondas compararam
+políticas na conta inteira, como se contatos fossem independentes. Três decisões tomadas por omissão,
+precificadas:
+
+- **Ajustar o limiar do roteador por acurácia em vez de por custo custa 7,51 horas-humano por mês.** O
+  corte de máxima acurácia é 0,45 e o de mínimo custo é 0,48 — três centésimos, 0,8506 segundos por
+  contato, sobre 31.802 contatos. Varrer um limiar por intent em vez de um único para os cinco economiza
+  mais **11,5552 segundos por contato**: 102,1 horas no mesmo mês, porque um limiar único é um
+  compromisso entre cinco intents que queriam respostas muito diferentes.
+- **E a forma fechada desse limiar, aplicada a este score, é 12,5% pior que o número único que ela
+  deveria melhorar.** Postergar abaixo de `1 − custo_de_postergar / custo_de_erro` é exatamente ótimo num
+  score que *é* a probabilidade de o rótulo estar certo. Este score é uma margem, então o **ordenamento**
+  dos cinco intents que a fórmula produz sobrevive intacto e os **níveis** não — ela posterga 23.304 de
+  31.802 contatos para evitar 2.414 erros de roteamento. Calibração é o passo que falta, e a fórmula o
+  assume em silêncio.
+- **O headcount prometido é alcançável, se 29% dos clientes desistirem.** Erlang C não tem nada a dizer
+  abaixo de oito atendentes nesta carga: a fila cresce sem limite, e o nível de serviço é reportado como
+  zero porque não existe espera a reportar. Erlang A tem resposta — com **seis** atendentes a fila é
+  perfeitamente estável, com **29,23% de abandono** e os atendentes restantes a **89,45% de ocupação**.
+  Os 5,51 atendentes do business case nunca foram impossíveis. Eram uma decisão não declarada de atender
+  sete contatos em dez.
+- **E uma fila subdimensionada fabrica o próprio trabalho extra.** Contatos abandonados voltam e o
+  retorno é carga, então a carga estabilizada é um ponto fixo: 9,1886 erlangs contra uma base de 7,5845,
+  o que são **+21,1% de carga e o abandono subindo de 29,23% para 38,45%**. Com onze atendentes a mesma
+  realimentação acrescenta 2,0% e estabiliza em 3,56% — erro de arredondamento no dimensionamento
+  adequado, que é o argumento a favor dos onze atendentes dito na moeda em que o abandono é pago.
+- **Um teste de duas políticas que acredita rodar a cinco por cento roda de fato a 8,43%.** Clientes
+  repetem, logo contatos são agrupados, e um teste por contato divide por um erro padrão pequeno demais
+  pela raiz do efeito de desenho. Detectar a diferença de 0,0916 da onda 1 exige 405 contatos por braço
+  se os contatos forem independentes e **523** a uma correlação de 0,30. A metade honesta deste
+  resultado: **a correlação medida neste gerador é aproximadamente zero**, porque todo traço é sorteado
+  por contato. Isso é uma limitação do simulador, publicada como tal — as correlações dos cenários acima
+  são declaradas, não medidas.
+
 ## Módulos
 
 | Módulo | O que decide |
@@ -113,6 +150,8 @@ inédito para uma régua de qualidade.
 | [`svclab.containment`](src/svclab/containment/README.md) | Qual número de contenção está sendo mostrado, entre os quatro que estão todos corretos; quanto dele chegou à fila, contra clientes que nunca encontraram o bot; e quais contatos o bot ficou. |
 | [`svclab.capacity`](src/svclab/capacity/README.md) | Quantos atendentes a fila precisa no seu nível de serviço, quantos a taxa de contenção prometeu, e de onde veio a diferença. |
 | [`svclab.quality`](src/svclab/quality/README.md) | Se a nota de qualidade é uma medição ou um hábito, quanto de uma diferença real este painel vai reportar, e o que um instrumento não qualificado custa em sessões. |
+| [`svclab.routing`](src/svclab/routing/README.md) | Onde cortar o score do classificador quando os dois erros custam números diferentes de segundos humanos, o que a forma fechada desse corte assume sobre o score, e por qual objetivo o corte está sendo ajustado. |
+| [`svclab.experiment`](src/svclab/experiment/README.md) | Quantos contatos um teste de duas políticas precisa quando clientes repetem, e a qual nível de significância um teste que ignora o agrupamento roda de fato. |
 
 Todo README de módulo é bilíngue e traz uma seção **Premissas e limitações**, porque uma cifra sem suas
 premissas não é um resultado.
@@ -123,6 +162,7 @@ premissas não é um resultado.
 | --- | --- |
 | [`examples/01_the_containment_that_wasnt.py`](examples/01_the_containment_that_wasnt.py) | Quatro políticas numa conta: as quatro taxas de contenção e o ranking que cada uma produz, quais contatos o bot ficou, o que a fila recebeu contra o que foi afirmado, e o business case de headcount decomposto nos seus três erros. |
 | [`examples/02_the_meter_that_was_noise.py`](examples/02_the_meter_that_was_noise.py) | O estudo do instrumento rodado antes da comparação: repetibilidade, reprodutibilidade, viés contra um padrão declarado, o fator exato pelo qual o painel encolhe toda diferença, o que isso custa em sessões, e contra o que um juiz automático seria validado. |
+| [`examples/03_three_numbers_nobody_priced.py`](examples/03_three_numbers_nobody_priced.py) | Os três padrões precificados: o limiar de roteamento varrido contra os dois objetivos e contra sua forma fechada, a fila com impaciência e com a realimentação de repetições resolvida até o ponto fixo, e o que custa um teste real de duas políticas quando clientes podem repetir. |
 
 ## Instalar e rodar
 
@@ -132,12 +172,13 @@ make check       # lint, tipos e a suíte rápida - o que libera um push
 make check-all   # o acima mais toda cifra documentada re-derivada
 python examples/01_the_containment_that_wasnt.py
 python examples/02_the_meter_that_was_noise.py
+python examples/03_three_numbers_nobody_priced.py
 ```
 
 ## Como as afirmações são mantidas honestas
 
-**152 testes, 100% de cobertura de linhas e de ramos.** 129 deles rodam em segundos e liberam cada push.
-Os 23 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
+**216 testes, 100% de cobertura de linhas e de ramos.** 183 deles rodam em segundos e liberam cada push.
+Os 33 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
 rodam o script de exemplo. Uma mudança que mova um número publicado quebra o build em vez de deixar o
 texto silenciosamente errado.
 
@@ -162,7 +203,7 @@ modo que a posição no stream depende de quantos valores são pedidos e não de
 responde. Essa regra é verificada contra o código-fonte, porque um repositório irmão publicou cifras
 que valiam numa máquina e mudavam numa instalação limpa.
 
-**E defeitos são registrados em vez de corrigidos em silêncio.** Nove até aqui, em
+**E defeitos são registrados em vez de corrigidos em silêncio.** Quatorze até aqui, em
 [`docs/ROADMAP.md`](docs/ROADMAP.md), cada um deles achado conectando os módulos, por um caso de
 controle ou verificando uma frase — nenhum lendo código. Dois valem a leitura. A sessão original cobrava
 um recontato como segundos extras em vez de como uma linha, o que torna o desvio aritmeticamente

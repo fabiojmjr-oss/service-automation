@@ -10,6 +10,7 @@ import pandas as pd
 from .config import CENTRE, SEED
 from .contacts import contacts, intent_truth
 from .quality import quality_noise
+from .routing import routing_scores
 
 
 @dataclass(frozen=True)
@@ -25,12 +26,15 @@ class Dataset:
             to that reading. The sample and the noise are draws; the quality being read is not.
         judge_noise: One row per contact: the noise the automated assessor adds. It reads
             everything, because that is the cheap assessor's whole argument.
+        routing_scores: One row per contact: the confidence the routing classifier reports in its
+            own label. Drawn last, so adding it cannot move a figure the earlier waves published.
     """
 
     contacts: pd.DataFrame
     intent_truth: pd.DataFrame
     panel_noise: pd.DataFrame
     judge_noise: pd.DataFrame
+    routing_scores: pd.DataFrame
 
 
 def generate_dataset(seed: int = SEED) -> Dataset:
@@ -51,9 +55,12 @@ def generate_dataset(seed: int = SEED) -> Dataset:
     # Appended after every draw in `contacts`, and it must stay there: inserting a draw earlier
     # shifts the whole stream and moves every figure wave 1 published.
     panel, judge = quality_noise(rng, CENTRE)
+    # And the routing scores after those, for the same reason.
+    scores = routing_scores(rng, table)
     return Dataset(
         contacts=table,
         intent_truth=intent_truth(table),
         panel_noise=panel,
         judge_noise=judge,
+        routing_scores=scores,
     )

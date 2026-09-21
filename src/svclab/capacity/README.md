@@ -100,6 +100,65 @@ the service level by a little: at that load the queue has no steady state at all
 next to every agent count for that reason, and a queue can hit its service level at an occupancy no
 team survives.
 
+## Result 5: the promised headcount is achievable, if a third of the customers give up
+
+Everything above is Erlang C, which assumes **infinite patience**. At a load of 7.5845 erlangs it has
+nothing at all to say below eight agents: the queue grows without bound, there is no steady state, and
+the service level is reported as zero because there is no wait to report.
+
+Real queues do have a steady state there. The mechanism is the customers leaving, and Erlang A is that
+mechanism — the same birth-death chain with an impatience rate added above the agent count. At a mean
+patience of four minutes:
+
+| Agents | Erlang C service level | Erlang C has an answer | **Abandonment** | Answered | Effective load | Occupancy |
+| --- | --- | --- | --- | --- | --- | --- |
+| 5 | 0.0000 | no | **0.3891** | 0.6109 | 4.6335 | **0.9267** |
+| **6** | 0.0000 | **no** | **0.2923** | 0.7077 | 5.3672 | **0.8945** |
+| 7 | 0.0000 | no | 0.2100 | 0.7900 | 5.9917 | 0.8560 |
+| 8 | 0.1751 | yes | 0.1434 | 0.8566 | 6.4967 | 0.8121 |
+| 10 | 0.7064 | yes | 0.0565 | 0.9435 | 7.1562 | 0.7156 |
+| **11** | 0.8368 | yes | **0.0324** | 0.9676 | 7.3390 | 0.6672 |
+| 14 | 0.9794 | yes | 0.0042 | 0.9958 | 7.5525 | 0.5395 |
+
+Result 2 said the business case promised **5.51 agents** and the queue needs **11**. This table says
+something sharper. **At six agents the queue is perfectly stable — with 29.23% of the customers
+abandoning and the survivors' agents running at 89.45% occupancy.** The promised headcount is not
+impossible. It is a decision to answer seven contacts in ten and staff the remainder at an occupancy no
+team sustains.
+
+Which is why Erlang C returning "no steady state" is a more useful error than it looks: it is the model
+saying that its assumption — that people wait — has been broken. Erlang A tells you *who* broke it.
+
+Two closed-form controls tie the models together, and both are asserted in the tests: abandonment falls
+monotonically towards zero as patience lengthens, reaching below 5e-6 at a thousand-hour patience, and
+Erlang A returns a finite answer at a load **above** the agent count where Erlang C returns exactly one
+and a service level of exactly zero.
+
+## Result 6: and the queue then feeds itself
+
+Wave 1 established that an abandoned contact is not a contact that went away: some share of the people
+who gave up come back, and their return is load. So abandonment raises the load, which raises
+abandonment, which raises the return. The settled load is the fixed point of
+
+> load = base load × (1 + repeat share × abandonment(load))
+
+solved by iterating it. At the 55% repeat share the generator declares for a tracking question:
+
+| Agents | Base load | **Settled load** | Added by repeats | Abandonment at the fixed point | Iterations |
+| --- | --- | --- | --- | --- | --- |
+| 6 | 7.5845 | **9.1886** | **+1.6041** | **0.3845** | 20 |
+| 8 | 7.5845 | 8.3478 | +0.7633 | 0.1830 | 19 |
+| 11 | 7.5845 | 7.7328 | +0.1483 | 0.0356 | 12 |
+
+**At six agents the repeats add 21.1% more load and push abandonment from 29.23% to 38.45%.** The
+understaffed queue is not merely worse than the plan; it manufactures its own extra work, and the
+arithmetic converges to a worse place than the arithmetic that ignores the feedback.
+
+At eleven agents — the count Result 2 says the work actually needs — the feedback adds 2.0% of load and
+settles at 3.56% abandonment. The same mechanism, and at adequate staffing it is a rounding error. That
+is the case for the eleven agents, stated in the currency the abandonment is paid in rather than in
+service level.
+
 ## Assumptions and limitations
 
 - **Every number here comes from a seeded synthetic generator.** No employer, client, vendor or
@@ -107,10 +166,14 @@ team survives.
 - **Erlang C assumes exponential handling times, Poisson arrivals, infinite patience in the human
   queue, and a steady state.** The generator draws handling times exponentially around a declared
   mean so the panel and the formula agree by construction — but real handling times are not
-  exponential, real arrivals are not stationary within a day, and **nobody in a real queue waits
-  forever**. The last of those is the significant one: modelling human-queue abandonment (Erlang A)
-  would change the agent counts and would not change the direction of any comparison here, because
-  every policy is priced with the same formula.
+  exponential and real arrivals are not stationary within a day. The infinite patience is no longer
+  an unexamined assumption: Results 5 and 6 price what impatience does, with Erlang A, and the agent
+  counts in Results 2 and 3 are still Erlang C's because holding the service level fixed is the
+  comparison those results are making.
+- **Erlang A here reports abandonment and not a service level.** The abandonment rate and the delay
+  probability follow exactly from the birth-death chain; the distribution of the wait *among those
+  answered* does not, without an approximation this module declines to make. So Results 5 and 6 quote
+  what is exact and stop, which is why the service level column in Result 5 is Erlang C's.
 - **One pooled queue, one skill, no shifts, no shrinkage.** A real plan multiplies these agent counts
   up for breaks, training, absence and schedule inefficiency, typically by a third or more. That
   multiplier applies to both sides of every comparison, so it scales the gap rather than closing it.
@@ -133,8 +196,8 @@ Cited as the origin of a *method*, never as a source of any number in these tabl
   Prospects.* Manufacturing & Service Operations Management 5(2). — where Erlang C's assumptions
   break in a real contact centre, and what Erlang A repairs.
 - Garnett, O., Mandelbaum, A., Reiman, M. (2002). *Designing a Call Center with Impatient Customers.*
-  Manufacturing & Service Operations Management 4(3). — the abandonment this module deliberately does
-  not model, and what it would change.
+  Manufacturing & Service Operations Management 4(3). — the impatient queue Results 5 and 6 price,
+  and the approximations for its waiting time that this module declines to use.
 
 ---
 
@@ -241,6 +304,65 @@ nível de serviço por pouco: naquela carga a fila não tem estado estacionário
 pertence ao lado de toda contagem de atendentes por esse motivo, e uma fila pode bater seu nível de
 serviço com uma ocupação que nenhuma equipe sobrevive.
 
+## Resultado 5: o headcount prometido é alcançável, se um terço dos clientes desistir
+
+Tudo acima é Erlang C, que supõe **paciência infinita**. Com carga de 7,5845 erlangs ele não tem nada a
+dizer abaixo de oito atendentes: a fila cresce sem limite, não há estado estacionário, e o nível de
+serviço é reportado como zero porque não há espera a reportar.
+
+Filas reais têm estado estacionário ali. O mecanismo são os clientes indo embora, e Erlang A é esse
+mecanismo — a mesma cadeia de nascimento e morte com uma taxa de impaciência acrescentada acima da
+contagem de atendentes. Com paciência média de quatro minutos:
+
+| Atendentes | Nível de serviço Erlang C | Erlang C tem resposta | **Abandono** | Atendidos | Carga efetiva | Ocupação |
+| --- | --- | --- | --- | --- | --- | --- |
+| 5 | 0,0000 | não | **0,3891** | 0,6109 | 4,6335 | **0,9267** |
+| **6** | 0,0000 | **não** | **0,2923** | 0,7077 | 5,3672 | **0,8945** |
+| 7 | 0,0000 | não | 0,2100 | 0,7900 | 5,9917 | 0,8560 |
+| 8 | 0,1751 | sim | 0,1434 | 0,8566 | 6,4967 | 0,8121 |
+| 10 | 0,7064 | sim | 0,0565 | 0,9435 | 7,1562 | 0,7156 |
+| **11** | 0,8368 | sim | **0,0324** | 0,9676 | 7,3390 | 0,6672 |
+| 14 | 0,9794 | sim | 0,0042 | 0,9958 | 7,5525 | 0,5395 |
+
+O Resultado 2 disse que o business case prometeu **5,51 atendentes** e a fila precisa de **11**. Esta
+tabela diz algo mais afiado. **Com seis atendentes a fila é perfeitamente estável — com 29,23% dos
+clientes abandonando e os atendentes dos sobreviventes a 89,45% de ocupação.** O headcount prometido não
+é impossível. É uma decisão de atender sete contatos em dez e operar o resto numa ocupação que nenhuma
+equipe sustenta.
+
+E é por isso que Erlang C devolver "sem estado estacionário" é um erro mais útil do que parece: é o
+modelo dizendo que sua premissa — que as pessoas esperam — foi quebrada. Erlang A diz *quem* a quebrou.
+
+Dois casos de controle em forma fechada amarram os dois modelos, e os dois estão asseridos nos testes: o
+abandono cai monotonicamente para zero conforme a paciência aumenta, ficando abaixo de 5e-6 com
+paciência de mil horas, e Erlang A devolve resposta finita numa carga **acima** da contagem de
+atendentes, onde Erlang C devolve exatamente um e nível de serviço exatamente zero.
+
+## Resultado 6: e então a fila se alimenta
+
+A onda 1 estabeleceu que um contato abandonado não é um contato que foi embora: uma fração dos que
+desistiram volta, e o retorno deles é carga. Então abandono aumenta a carga, que aumenta o abandono, que
+aumenta o retorno. A carga de equilíbrio é o ponto fixo de
+
+> carga = carga base × (1 + fração de retorno × abandono(carga))
+
+resolvido por iteração. Na fração de retorno de 55% que o gerador declara para uma pergunta de rastreio:
+
+| Atendentes | Carga base | **Carga de equilíbrio** | Adicionado pelos retornos | Abandono no ponto fixo | Iterações |
+| --- | --- | --- | --- | --- | --- |
+| 6 | 7,5845 | **9,1886** | **+1,6041** | **0,3845** | 20 |
+| 8 | 7,5845 | 8,3478 | +0,7633 | 0,1830 | 19 |
+| 11 | 7,5845 | 7,7328 | +0,1483 | 0,0356 | 12 |
+
+**Com seis atendentes os retornos acrescentam 21,1% mais carga e empurram o abandono de 29,23% para
+38,45%.** A fila subdimensionada não é apenas pior que o plano; ela fabrica o próprio trabalho extra, e
+a aritmética converge para um lugar pior que a aritmética que ignora a realimentação.
+
+Com onze atendentes — a contagem que o Resultado 2 diz que o trabalho realmente exige — a realimentação
+acrescenta 2,0% de carga e estabiliza em 3,56% de abandono. O mesmo mecanismo, e com dimensionamento
+adequado ele é erro de arredondamento. Esse é o argumento a favor dos onze atendentes, dito na moeda em
+que o abandono é pago e não em nível de serviço.
+
 ## Premissas e limitações
 
 - **Todo número aqui vem de um gerador sintético com semente.** Nenhum dado de empregador, cliente,
@@ -248,10 +370,14 @@ serviço com uma ocupação que nenhuma equipe sobrevive.
 - **Erlang C supõe tempos de atendimento exponenciais, chegadas de Poisson, paciência infinita na fila
   humana e estado estacionário.** O gerador sorteia tempos de atendimento exponencialmente em torno de
   uma média declarada, então o painel e a fórmula concordam por construção — mas tempos reais não são
-  exponenciais, chegadas reais não são estacionárias dentro do dia, e **ninguém numa fila real espera
-  para sempre**. O último é o significativo: modelar abandono na fila humana (Erlang A) mudaria as
-  contagens de atendentes e não mudaria a direção de nenhuma comparação aqui, porque toda política é
-  precificada com a mesma fórmula.
+  exponenciais e chegadas reais não são estacionárias dentro do dia. A paciência infinita já não é
+  premissa não examinada: os Resultados 5 e 6 precificam o que a impaciência faz, com Erlang A, e as
+  contagens de atendentes dos Resultados 2 e 3 continuam sendo as de Erlang C porque manter o nível de
+  serviço fixo é a comparação que aqueles resultados fazem.
+- **Erlang A aqui reporta abandono e não nível de serviço.** A taxa de abandono e a probabilidade de
+  espera decorrem exatamente da cadeia de nascimento e morte; a distribuição da espera *entre os
+  atendidos* não, sem uma aproximação que este módulo recusa fazer. Então os Resultados 5 e 6 citam o
+  que é exato e param, e é por isso que a coluna de nível de serviço do Resultado 5 é a de Erlang C.
 - **Uma fila única, uma habilidade, sem turnos, sem shrinkage.** Um plano real multiplica estas
   contagens para pausas, treinamento, ausência e ineficiência de escala, tipicamente por um terço ou
   mais. Esse multiplicador se aplica aos dois lados de toda comparação, então ele escala a diferença em
@@ -275,5 +401,5 @@ Citadas como origem de um *método*, nunca como fonte de qualquer número destas
   Prospects.* Manufacturing & Service Operations Management 5(2). — onde as premissas de Erlang C
   quebram numa central real, e o que Erlang A conserta.
 - Garnett, O., Mandelbaum, A., Reiman, M. (2002). *Designing a Call Center with Impatient Customers.*
-  Manufacturing & Service Operations Management 4(3). — o abandono que este módulo deliberadamente não
-  modela, e o que ele mudaria.
+  Manufacturing & Service Operations Management 4(3). — a fila impaciente que os Resultados 5 e 6
+  precificam, e as aproximações para seu tempo de espera que este módulo recusa usar.

@@ -17,8 +17,18 @@ import pandas as pd
 import pytest
 
 from svclab.bot import GUARDED, HUMAN_ONLY, PATIENT, POLICIES, THREE_TURNS, run
-from svclab.capacity import agents_for, capacity_table, erlang_b, erlang_c, occupancy, service_level
+from svclab.capacity import (
+    agents_for,
+    capacity_table,
+    erlang_b,
+    erlang_c,
+    impatience_table,
+    load_with_repeats,
+    occupancy,
+    service_level,
+)
 from svclab.containment import containment_table, deflection, selection_profile
+from svclab.experiment import intracluster_correlation, sizing_table
 from svclab.quality import (
     agreement_table,
     attenuation,
@@ -30,7 +40,8 @@ from svclab.quality import (
     sessions_for_difference,
     youden,
 )
-from svclab.synth import CENTRE, QUALITY, Dataset
+from svclab.routing import best_by, calibrated_threshold, cost_curve, cost_of, defer_below
+from svclab.synth import CENTRE, QUALITY, ROUTING, Dataset
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -529,3 +540,233 @@ def test_what_the_judge_would_be_validated_against_is_what_is_published(graded: 
     # The two claims the document ends on, as orderings.
     assert kappa(judge_sample, truth) > kappa(judge_sample, votes)
     assert kappa(votes, truth) > kappa(judge_sample, truth)
+
+
+# --- Wave 3, front one: svclab.routing ---------------------------------------------------------
+
+
+WAVE_THREE_GRID = tuple(round(value, 2) for value in np.arange(0.0, 1.01, 0.02))
+
+
+def wave_three_price(
+    contacts: pd.DataFrame, scores: pd.DataFrame, rule: float | dict[str, float]
+) -> tuple[float, float, float, float]:
+    """Seconds per contact, resolution, misroutes and deferrals under one routing rule."""
+    routed = defer_below(contacts, scores, rule)
+    outcomes = run(routed, THREE_TURNS)
+    measured = cost_of(outcomes, routed)
+    total = measured["human_seconds"] + measured["misroute_seconds"] + measured["defer_seconds"]
+    first = outcomes[~outcomes["is_repeat"]]
+    return (
+        total / len(routed),
+        float(first["resolved"].mean()),
+        measured["misroutes"],
+        measured["deferred"],
+    )
+
+
+def test_the_score_separates_correct_labels_by_what_is_published(full: Dataset) -> None:
+    treated = full.contacts[~full.contacts["holdout"]]
+    routed = defer_below(treated, full.routing_scores, 0.0)
+    outcomes = run(routed, THREE_TURNS)
+    first = outcomes[~outcomes["is_repeat"]].set_index("contact")
+    correct = first["classified_correctly"].reindex(routed["contact"]).to_numpy(dtype=bool)
+    score = routed["classifier_score"].to_numpy(dtype=float)
+    assert float(score[correct].mean()) == pytest.approx(0.6975, abs=5e-5)
+    assert float(score[~correct].mean()) == pytest.approx(0.4293, abs=5e-5)
+    assert float(correct.mean()) == pytest.approx(0.7771, abs=5e-5)
+    above = score > 0.7
+    assert float(correct[above].mean()) == pytest.approx(0.9907, abs=5e-5)
+
+
+def test_the_two_routing_objectives_disagree_by_what_is_published(full: Dataset) -> None:
+    treated = full.contacts[~full.contacts["holdout"]]
+    thresholds = tuple(round(value, 2) for value in np.arange(0.30, 0.71, 0.01))
+    curve = cost_curve(treated, full.routing_scores, THREE_TURNS, thresholds)
+    accuracy = best_by(curve, "label_accuracy", True)
+    cost = best_by(curve, "seconds_per_contact", False)
+    assert accuracy == pytest.approx(0.45, abs=5e-3)
+    assert cost == pytest.approx(0.48, abs=5e-3)
+    indexed = curve.set_index("threshold")
+    at_accuracy = float(indexed.loc[accuracy, "seconds_per_contact"])
+    at_cost = float(indexed.loc[cost, "seconds_per_contact"])
+    assert at_accuracy == pytest.approx(346.4851, abs=5e-4)
+    assert at_cost == pytest.approx(345.6345, abs=5e-4)
+    assert at_accuracy - at_cost == pytest.approx(0.8506, abs=5e-4)
+    assert (at_accuracy - at_cost) * len(treated) / 3600.0 == pytest.approx(7.51, abs=5e-3)
+
+
+def test_the_ends_of_the_cost_curve_are_what_is_published(full: Dataset) -> None:
+    treated = full.contacts[~full.contacts["holdout"]]
+    curve = cost_curve(treated, full.routing_scores, THREE_TURNS, (0.0, 0.95)).set_index(
+        "threshold"
+    )
+    assert int(curve.loc[0.0, "misroutes"]) == 7_090
+    assert float(curve.loc[0.0, "misroute_seconds"]) == pytest.approx(1_812_030.0, abs=0.5)
+    assert int(curve.loc[0.95, "misroutes"]) == 0
+    assert float(curve.loc[0.95, "defer_seconds"]) == pytest.approx(600_720.0, abs=0.5)
+
+
+def test_the_per_intent_thresholds_are_what_is_published(full: Dataset) -> None:
+    published = {
+        "rastreio": (60.0, 0.10, 0.6667),
+        "prazo-de-entrega": (90.0, 0.28, 0.7778),
+        "cadastro": (150.0, 0.38, 0.8667),
+        "reembolso": (420.0, 0.60, 0.9524),
+        "reclamacao": (540.0, 0.62, 0.9630),
+    }
+    treated = full.contacts[~full.contacts["holdout"]]
+    for intent, (seconds, swept, formula) in published.items():
+        assert ROUTING.misroute_seconds[intent] == seconds, intent
+        assert calibrated_threshold(ROUTING.defer_seconds, seconds) == pytest.approx(
+            formula, abs=5e-5
+        ), intent
+        subset = treated[treated["intent"] == intent]
+        costs = {
+            candidate: wave_three_price(subset, full.routing_scores, candidate)[0]
+            for candidate in WAVE_THREE_GRID
+        }
+        assert min(costs, key=lambda key: costs[key]) == pytest.approx(swept, abs=5e-3), intent
+
+
+def test_the_three_routing_rules_are_what_is_published(full: Dataset) -> None:
+    """Including the one that corrected this wave's first draft."""
+    treated = full.contacts[~full.contacts["holdout"]]
+    swept = {
+        "rastreio": 0.10,
+        "prazo-de-entrega": 0.28,
+        "cadastro": 0.38,
+        "reembolso": 0.60,
+        "reclamacao": 0.62,
+    }
+    formula = {
+        intent: calibrated_threshold(ROUTING.defer_seconds, seconds)
+        for intent, seconds in ROUTING.misroute_seconds.items()
+    }
+    published = {
+        "single": (0.48, 345.6345, 0.7067, 2_472, 7_036),
+        "swept": (swept, 334.0793, 0.6925, 3_754, 5_525),
+        "formula": (formula, 388.8874, 0.8611, 58, 23_304),
+    }
+    measured = {}
+    for label, (rule, seconds, resolution, misroutes, deferred) in published.items():
+        cost, resolved, missed, deferred_count = wave_three_price(
+            treated, full.routing_scores, rule
+        )
+        assert cost == pytest.approx(seconds, abs=5e-4), label
+        assert resolved == pytest.approx(resolution, abs=5e-5), label
+        assert int(missed) == misroutes, label
+        assert int(deferred_count) == deferred, label
+        measured[label] = cost
+
+    saved = measured["single"] - measured["swept"]
+    assert saved == pytest.approx(11.5552, abs=5e-4)
+    assert saved * len(treated) / 3600.0 == pytest.approx(102.1, abs=5e-2)
+    assert measured["formula"] / measured["single"] - 1.0 == pytest.approx(0.125, abs=5e-4)
+
+
+# --- Wave 3, front two: impatience in svclab.capacity ------------------------------------------
+
+
+WAVE_THREE_LOAD = 7.5845
+WAVE_THREE_HANDLING = 512.25
+WAVE_THREE_PATIENCE = 240.0
+
+
+def test_the_impatience_table_is_what_is_published() -> None:
+    published = {
+        5: (0.3891, 0.9267, False),
+        6: (0.2923, 0.8945, False),
+        7: (0.2100, 0.8560, False),
+        8: (0.1434, 0.8121, True),
+        10: (0.0565, 0.7156, True),
+        11: (0.0324, 0.6672, True),
+        14: (0.0042, 0.5395, True),
+    }
+    table = impatience_table(
+        tuple(published), WAVE_THREE_LOAD, WAVE_THREE_PATIENCE, WAVE_THREE_HANDLING, 20.0
+    ).set_index("agents")
+    for agents, (leaving, busy, stable) in published.items():
+        row = table.loc[agents]
+        assert float(row["abandonment"]) == pytest.approx(leaving, abs=5e-5), agents
+        assert float(row["occupancy"]) == pytest.approx(busy, abs=5e-5), agents
+        assert bool(row["erlang_c_stable"]) is stable, agents
+    # The service levels Erlang C reports where it has an answer at all.
+    assert float(table.loc[8, "erlang_c_service_level"]) == pytest.approx(0.1751, abs=5e-5)
+    assert float(table.loc[11, "erlang_c_service_level"]) == pytest.approx(0.8368, abs=5e-5)
+    assert float(table.loc[14, "erlang_c_service_level"]) == pytest.approx(0.9794, abs=5e-5)
+
+
+def test_the_repeat_fixed_point_is_what_is_published() -> None:
+    published = {
+        6: (9.1886, 1.6041, 0.3845, 20),
+        8: (8.3478, 0.7633, 0.1830, 19),
+        11: (7.7328, 0.1483, 0.0356, 12),
+    }
+    for agents, (settled, added, leaving, steps) in published.items():
+        measured = load_with_repeats(
+            agents, WAVE_THREE_LOAD, WAVE_THREE_PATIENCE, WAVE_THREE_HANDLING, 0.55
+        )
+        assert measured["settled_load"] == pytest.approx(settled, abs=5e-5), agents
+        assert measured["added_load"] == pytest.approx(added, abs=5e-5), agents
+        assert measured["abandonment"] == pytest.approx(leaving, abs=5e-5), agents
+        assert int(measured["iterations"]) == steps, agents
+    six = load_with_repeats(6, WAVE_THREE_LOAD, WAVE_THREE_PATIENCE, WAVE_THREE_HANDLING, 0.55)
+    eleven = load_with_repeats(11, WAVE_THREE_LOAD, WAVE_THREE_PATIENCE, WAVE_THREE_HANDLING, 0.55)
+    assert six["settled_load"] / WAVE_THREE_LOAD - 1.0 == pytest.approx(0.211, abs=5e-4)
+    assert eleven["settled_load"] / WAVE_THREE_LOAD - 1.0 == pytest.approx(0.020, abs=5e-4)
+
+
+# --- Wave 3, front three: svclab.experiment ----------------------------------------------------
+
+
+def test_the_clustering_of_this_account_is_what_is_published(full: Dataset) -> None:
+    treated = full.contacts[~full.contacts["holdout"]]
+    outcomes = run(treated, THREE_TURNS)
+    first = outcomes[~outcomes["is_repeat"]].copy()
+    first["resolved_num"] = first["resolved"].astype(float)
+    first["human_num"] = first["handled_by_human"].astype(float)
+    assert len(first) == 31_802
+    assert first["customer"].nunique() == 16_195
+    size = len(first) / first["customer"].nunique()
+    assert size == pytest.approx(1.9637, abs=5e-5)
+    assert intracluster_correlation(first, "customer", "resolved_num") == pytest.approx(
+        -0.012563, abs=5e-7
+    )
+    assert intracluster_correlation(first, "customer", "human_num") == pytest.approx(
+        0.000876, abs=5e-7
+    )
+
+
+def test_the_sizing_table_is_what_is_published(full: Dataset) -> None:
+    published = {
+        "independent contacts": (0.00, 1.0000, 405.3562, 206.4255, 0.0500),
+        "correlation 0.05": (0.05, 1.0482, 424.8882, 216.3721, 0.0556),
+        "correlation 0.10": (0.10, 1.0964, 444.4201, 226.3186, 0.0612),
+        "correlation 0.20": (0.20, 1.1927, 483.4840, 246.2117, 0.0727),
+        "correlation 0.30": (0.30, 1.2891, 522.5479, 266.1047, 0.0843),
+        "total correlation": (1.00, 1.9637, 795.9950, 405.3562, 0.1619),
+    }
+    treated = full.contacts[~full.contacts["holdout"]]
+    three = run(treated, THREE_TURNS)
+    guarded = run(treated, GUARDED)
+    first = three[~three["is_repeat"]]
+    size = len(first) / first["customer"].nunique()
+    guarded_rate = float(guarded[~guarded["is_repeat"]]["resolved"].mean())
+    three_rate = float(first["resolved"].mean())
+    assert guarded_rate == pytest.approx(0.7271, abs=5e-5)
+    assert three_rate == pytest.approx(0.6355, abs=5e-5)
+
+    scenarios = {name: (size, icc) for name, (icc, *_rest) in published.items()}
+    table = sizing_table(scenarios, guarded_rate, three_rate, size).set_index("scenario")
+    for name, (_icc, effect, contacts, customers, alpha) in published.items():
+        row = table.loc[name]
+        assert float(row["design_effect"]) == pytest.approx(effect, abs=5e-5), name
+        assert float(row["contacts_per_arm"]) == pytest.approx(contacts, abs=5e-4), name
+        assert float(row["customers_per_arm"]) == pytest.approx(customers, abs=5e-4), name
+        assert float(row["actual_alpha"]) == pytest.approx(alpha, abs=5e-5), name
+    heavy = table.loc["correlation 0.30"]
+    plain = table.loc["independent contacts"]
+    assert float(heavy["contacts_per_arm"]) / float(plain["contacts_per_arm"]) - 1.0 == (
+        pytest.approx(0.289, abs=5e-4)
+    )

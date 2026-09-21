@@ -17,10 +17,14 @@ import pytest
 from svclab.bot import HUMAN_ONLY, THREE_TURNS, run
 from svclab.capacity import (
     CAPACITY_COLUMNS,
+    IMPATIENCE_COLUMNS,
+    abandonment,
     agents_for,
     capacity_table,
     erlang_b,
     erlang_c,
+    impatience_table,
+    load_with_repeats,
     occupancy,
     offered_load,
     promised_agents,
@@ -206,3 +210,107 @@ class TestTheTableOnTheRealAccount:
         promised = promised_agents(staffing(len(base_human), base_seconds), 0.6065)
         assert steps[0] > promised
         assert not math.isnan(promised)
+
+
+class TestImpatience:
+    def test_endless_patience_converges_on_no_abandonment(self) -> None:
+        """The control that ties Erlang A to Erlang C: with nobody leaving, nobody leaves.
+
+        Checked as a limit rather than at a point, because the convergence is what makes the two
+        models the same model with one parameter switched off.
+        """
+        measured = [abandonment(14, 10.1268, patience, 395.43) for patience in (600, 6_000, 60_000)]
+        assert measured == sorted(measured, reverse=True)
+        assert measured[-1] < 5e-4
+        assert abandonment(14, 10.1268, 6_000_000.0, 395.43) < 5e-6
+
+    def test_a_vanishing_load_abandons_nobody_exactly(self) -> None:
+        assert abandonment(5, 0.0, 240.0, 395.43) == 0.0
+
+    def test_abandonment_falls_as_agents_are_added(self) -> None:
+        measured = [abandonment(agents, 7.5845, 240.0, 512.25) for agents in range(5, 15)]
+        assert measured == sorted(measured, reverse=True)
+
+    def test_abandonment_rises_with_the_load(self) -> None:
+        measured = [abandonment(8, load, 240.0, 512.25) for load in (4.0, 6.0, 8.0, 10.0)]
+        assert measured == sorted(measured)
+
+    def test_it_answers_where_erlang_c_cannot(self) -> None:
+        """The whole reason the model exists: above the agent count Erlang C has no steady state and
+        Erlang A does, because impatience removes the work the agents cannot."""
+        assert erlang_c(11, 12.0) == 1.0
+        assert service_level(11, 12.0, 395.43, 20.0) == 0.0
+        leaving = abandonment(11, 12.0, 240.0, 395.43)
+        assert 0.0 < leaving < 1.0
+
+    def test_impossible_arguments_are_refused(self) -> None:
+        with pytest.raises(ValueError, match="at least one agent"):
+            abandonment(0, 5.0, 240.0, 395.43)
+        for patience, handling in ((0.0, 395.43), (240.0, 0.0), (-1.0, 395.43)):
+            with pytest.raises(ValueError, match="must both be positive"):
+                abandonment(5, 5.0, patience, handling)
+        with pytest.raises(ValueError, match="cannot be negative"):
+            abandonment(5, -1.0, 240.0, 395.43)
+
+    def test_a_queue_this_model_will_not_report_on_is_refused(self) -> None:
+        """Patience long enough and a load high enough, and the tail no longer fits in the states
+        summed. Refusing beats truncating and rounding the answer towards optimism."""
+        with pytest.raises(ValueError, match="still carries"):
+            abandonment(5, 500.0, 1e9, 395.43)
+
+    def test_the_table_marks_where_erlang_c_has_nothing_to_say(self) -> None:
+        table = impatience_table((6, 8, 14), 7.5845, 240.0, 512.25, 20.0)
+        assert tuple(table.columns) == IMPATIENCE_COLUMNS
+        indexed = table.set_index("agents")
+        assert not bool(indexed.loc[6, "erlang_c_stable"])
+        assert float(indexed.loc[6, "erlang_c_service_level"]) == 0.0
+        assert 0.0 < float(indexed.loc[6, "abandonment"]) < 1.0
+        assert bool(indexed.loc[14, "erlang_c_stable"])
+        for _, row in table.iterrows():
+            assert float(row["answered_share"]) == pytest.approx(1.0 - float(row["abandonment"]))
+            assert float(row["effective_load"]) == pytest.approx(
+                float(row["offered_load"]) * float(row["answered_share"])
+            )
+            assert float(row["occupancy"]) == pytest.approx(
+                float(row["effective_load"]) / float(row["agents"])
+            )
+
+    def test_an_empty_table_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="no staffing levels"):
+            impatience_table((), 7.5845, 240.0, 512.25, 20.0)
+
+
+class TestTheQueueThatFeedsItself:
+    def test_no_repeats_leaves_the_load_where_it_started(self) -> None:
+        settled = load_with_repeats(11, 7.5845, 240.0, 512.25, 0.0)
+        assert settled["settled_load"] == pytest.approx(7.5845, abs=1e-12)
+        assert settled["added_load"] == pytest.approx(0.0, abs=1e-12)
+
+    def test_the_settled_load_satisfies_the_equation_it_solves(self) -> None:
+        """The fixed point, checked against its own definition rather than against a target."""
+        share = 0.55
+        settled = load_with_repeats(8, 7.5845, 240.0, 512.25, share)
+        leaving = abandonment(8, settled["settled_load"], 240.0, 512.25)
+        assert settled["settled_load"] == pytest.approx(7.5845 * (1.0 + share * leaving), rel=1e-9)
+        assert settled["abandonment"] == pytest.approx(leaving, rel=1e-9)
+
+    def test_more_repeats_and_fewer_agents_both_settle_higher(self) -> None:
+        by_share = [
+            load_with_repeats(8, 7.5845, 240.0, 512.25, share)["settled_load"]
+            for share in (0.0, 0.25, 0.55, 0.9)
+        ]
+        assert by_share == sorted(by_share)
+        by_agents = [
+            load_with_repeats(agents, 7.5845, 240.0, 512.25, 0.55)["settled_load"]
+            for agents in (6, 8, 11, 14)
+        ]
+        assert by_agents == sorted(by_agents, reverse=True)
+
+    def test_a_share_that_is_not_a_share_is_refused(self) -> None:
+        for share in (-0.1, 1.2):
+            with pytest.raises(ValueError, match="has to be a share"):
+                load_with_repeats(8, 7.5845, 240.0, 512.25, share)
+
+    def test_a_queue_that_never_settles_says_so(self) -> None:
+        with pytest.raises(ValueError, match="did not settle"):
+            load_with_repeats(8, 7.5845, 240.0, 512.25, 0.55, limit=2)

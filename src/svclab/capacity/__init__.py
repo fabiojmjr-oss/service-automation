@@ -8,10 +8,16 @@ contact than the volume it removed, and the repeats it generates arrive in the s
 
 from .queue import (
     CAPACITY_COLUMNS,
+    IMPATIENCE_COLUMNS,
+    QUEUE_STATES,
+    TAIL_TOLERANCE,
+    abandonment,
     agents_for,
     capacity_table,
     erlang_b,
     erlang_c,
+    impatience_table,
+    load_with_repeats,
     occupancy,
     offered_load,
     promised_agents,
@@ -20,10 +26,16 @@ from .queue import (
 
 __all__ = [
     "CAPACITY_COLUMNS",
+    "IMPATIENCE_COLUMNS",
+    "QUEUE_STATES",
+    "TAIL_TOLERANCE",
+    "abandonment",
     "agents_for",
     "capacity_table",
     "erlang_b",
     "erlang_c",
+    "impatience_table",
+    "load_with_repeats",
     "occupancy",
     "offered_load",
     "promised_agents",

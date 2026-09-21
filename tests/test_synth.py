@@ -124,6 +124,15 @@ class TestTheQualitySample:
         for profile in GRADERS:
             assert float(measured[profile.grader]) == pytest.approx(profile.noise_sd, rel=0.06)
 
+    def test_a_contact_table_without_what_the_score_needs_is_refused(self, full: Dataset) -> None:
+        from svclab.synth import routing_scores
+
+        for column in ("difficulty", "classifier_draw", "intent"):
+            with pytest.raises(KeyError, match="missing"):
+                routing_scores(
+                    np.random.default_rng(0), full.contacts.head(50).drop(columns=[column])
+                )
+
     def test_a_sample_larger_than_the_centre_is_refused(self, full: Dataset) -> None:
         from dataclasses import replace
 

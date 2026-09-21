@@ -88,8 +88,8 @@ def run(
     1. The contact is classified. It lands on the right intent when its own classifier draw falls
        under the accuracy its intent and difficulty imply, and on that intent's declared confusion
        target otherwise.
-    2. A contact in the holdout arm, or one whose **predicted** intent the policy refuses, goes
-       straight to a human.
+    2. A contact in the holdout arm, one a router deferred, or one whose **predicted** intent the
+       policy refuses, goes straight to a human.
     3. Otherwise the bot tries. It resolves the contact if the contact is resolvable *and* the
        classification was right, and only if the turns that takes fit inside both the policy's
        budget and the customer's patience.
@@ -142,7 +142,15 @@ def run(
 
     refused = np.array([value in policy.straight_to_human for value in predicted])
     holdout = contacts["holdout"].to_numpy(dtype=bool)
-    to_human = holdout | refused | (policy.turn_budget == 0)
+    # An optional `defer` column lets a router send a contact past the bot without the policy having
+    # refused its intent. Absent, nothing is deferred - so every figure published before this column
+    # existed is unaffected by it.
+    deferred = (
+        contacts["defer"].to_numpy(dtype=bool)
+        if "defer" in contacts.columns
+        else np.zeros(len(contacts), dtype=bool)
+    )
+    to_human = holdout | refused | deferred | (policy.turn_budget == 0)
 
     needed = _turns_needed(difficulty)
     patience = contacts["patience_turns"].to_numpy(dtype=float)
@@ -191,7 +199,11 @@ def run(
             "intent": contacts["intent"].to_numpy(),
             "predicted_intent": predicted,
             "classified_correctly": correct,
-            "route": np.where(holdout, "holdout", np.where(refused, "refused", "bot")),
+            "route": np.where(
+                holdout,
+                "holdout",
+                np.where(refused, "refused", np.where(deferred, "deferred", "bot")),
+            ),
             "bot_turns": bot_turns,
             "outcome": outcome,
             "handled_by_human": handled_by_human,
