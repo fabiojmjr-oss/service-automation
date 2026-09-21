@@ -38,11 +38,16 @@ from .config import CENTRE, POPULATION, CentreProfile, PopulationProfile
 from .contacts import intent_index, outcomes_from_difficulty
 
 #: Columns of the per-customer component frame, indexed by customer id.
-CUSTOMER_COLUMNS = ("customer", "difficulty_percentile", "patience_percentile")
+CUSTOMER_COLUMNS = (
+    "customer",
+    "difficulty_percentile",
+    "patience_percentile",
+    "propensity_percentile",
+)
 
 
 def customer_components(rng: np.random.Generator, centre: CentreProfile = CENTRE) -> pd.DataFrame:
-    """One row per customer: the percentile of difficulty and of patience that is the person.
+    """One row per customer: the percentiles of difficulty, patience and contact propensity.
 
     Percentiles rather than values, because the copula works on percentiles and because a percentile
     is the one representation that does not commit to a distribution. Two draws per customer and not
@@ -60,6 +65,9 @@ def customer_components(rng: np.random.Generator, centre: CentreProfile = CENTRE
             "customer": np.arange(centre.customers, dtype=int),
             "difficulty_percentile": uniform(rng, centre.customers),
             "patience_percentile": uniform(rng, centre.customers),
+            # Appended last, and drawn even in the world that does not use it: how often somebody
+            # contacts is the third thing about a customer that waves 1 to 3 held constant.
+            "propensity_percentile": uniform(rng, centre.customers),
         }
     )[list(CUSTOMER_COLUMNS)]
 

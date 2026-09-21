@@ -165,11 +165,11 @@ contatos de uma mesma pessoa. O mundo independente é, assim, um **controle**, n
   viés é correlacionado, não uma moeda correlacionada, e a uma taxa de resolução perto de 0,64 a moeda
   é a maior parte da variância. A regra que segue é curta: **estime a correlação do desfecho que você
   está testando, nunca a do traço que você acredita que o dirige.**
-- **O que torna o alarme da própria onda 3 sete vezes alto demais nesta conta.** O efeito de desenho
-  medido é **1,0432** — 4,32% mais amostra, e um teste nominal de 5% rodando de fato a **5,50%** —
+- **O que torna o alarme da própria onda 3 quatro vezes alto demais nesta conta.** O efeito de desenho
+  medido é **1,0693** — 6,93% mais amostra, e um teste nominal de 5% rodando de fato a **5,80%** —
   contra os 1,2891 e 8,43% que a onda 3 precificou a um declarado 0,30. No dimensionamento da onda 3,
-  de 405 contatos por braço, o poder é 0,8026 se os contatos forem independentes, **0,7859** no efeito
-  medido e 0,6970 no declarado: **1,7 ponto de poder, não 11.** O efeito é real, mensurável e modesto,
+  de 405 contatos por braço, o poder é 0,8026 se os contatos forem independentes, **0,7759** no efeito
+  medido e 0,6970 no declarado: **2,7 pontos de poder, não 11.** O efeito é real, mensurável e modesto,
   porque um efeito de desenho é produto de dois fatores e os grupos desta conta têm em média dois
   contatos.
 - **E o KPI é cego para o que a operação sente.** Entre clientes com exatamente dois contatos, a
@@ -177,12 +177,51 @@ contatos de uma mesma pessoa. O mundo independente é, assim, um **controle**, n
   volume, enquanto a taxa de resolução se move 0,0002. Uma taxa de resolução é ponderada por contato;
   uma reclamação, um churn e um ofício de regulador são ponderados por cliente. As duas coincidem
   exatamente quando um cliente é um rótulo.
-- **E a correção que a maioria usa custa dezenove vezes o erro que corrige.** Tirar a média da média
+- **E a correção que a maioria usa custa doze vezes o erro que corrige.** Tirar a média da média
   de cada cliente infla o erro padrão em **13,3% no mundo independente** — onde não há correlação
   alguma a corrigir — porque pesar igualmente grupos de tamanhos diferentes descarta informação. A
-  contribuição da própria correlação para o mesmo erro padrão é de **0,7%**. A linha do mundo
+  contribuição da própria correlação para o mesmo erro padrão é de **1,1%**. A linha do mundo
   independente é a única razão pela qual isso fica visível, e é o argumento a favor de manter um mundo
   de controle em vez de uma história melhor.
+
+## E o cliente que mais contatava era movimentado por acaso
+
+O mundo acima dá a cada cliente uma dificuldade e uma paciência próprias, e deixa a **taxa** dele de
+lado: cada contato ainda escolhe um cliente uniformemente, então as contagens de contato são Poisson
+com média abaixo de dois e o cliente mais movimentado da conta é movimentado por sorte. Uma conta real
+quebra isso duas vezes — o volume dela é **concentrado**, e a minoria que o gera **não é aleatória**,
+porque quem mais contata é, em média, quem tem os problemas mais difíceis.
+
+Então os mesmos 31.802 contatos são reagrupados em clientes cuja taxa de contato é log-normal e
+correlacionada com a própria dificuldade a um declarado 0,40. O reagrupamento reaproveita o uniforme
+que escolheu o cliente originalmente e nunca cruza um braço, então **toda cifra por contato permanece
+idêntica, bit a bit** — verificada exatamente, não por tolerância. O controle é o mesmo reagrupamento
+com **taxas iguais**, porque reatribuir contatos entre os clientes que a conta de fato viu já aumenta
+os grupos por si só.
+
+- **O mesmo volume chega de 10.640 pessoas em vez de 13.087, e a média quase não percebe.** Os
+  contatos médios por cliente sobem 23%, de 2,43 para 2,99. O tamanho **efetivo** de grupo — a média
+  ponderada por tamanho, que é a quantidade de que um efeito de desenho é calculado — sobe **78%**, de
+  3,23 para **5,75**. Concentração é uma afirmação sobre a variância dos tamanhos de grupo.
+- **E é aqui que o alarme da onda 3 volta: o efeito de desenho é 1,2246, ou 95% dos 1,2891 que a onda
+  3 declarou como seu caso sério.** A onda 4 mediu 1,0693 e chamou aquele alarme de quatro vezes alto
+  demais — num mundo em que todos contatam na mesma taxa, o que ela havia assumido e não escolhido.
+  Duas premissas erradas em direções opostas cujo produto ficou perto do certo — e um teste nominal de
+  5% aqui roda de fato a **7,65%**.
+- **O custo se concentra mais rápido que o volume.** No controle, o décimo mais pesado de clientes gera
+  21,97% dos contatos, 22,01% das falhas e 22,01% das horas humanas — um único número, porque ser
+  pesado não diz nada sobre ser difícil. Concentrado: 31,6% do volume, 32,7% das falhas e **35,4% das
+  horas**. E a população falhada três vezes ou mais vai de 794 clientes para **1.305**.
+- **A taxa de resolução cai 1,53 ponto sem mudança nenhuma de política.** A distribuição de dificuldade
+  **por cliente** está inalterada; a **por contato** não está, porque os clientes difíceis agora mandam
+  mais contatos cada um. A dificuldade média por contato sobe 9,9%. A mistura de dificuldade que a fila
+  recebe é propriedade de quem liga, não só de quem essas pessoas são — e nenhum business case modela
+  isso.
+- **E a estimativa central da onda 1 perde um terço da precisão.** Deflexão por cliente não é
+  comparável entre mundos que discordam sobre quantos clientes existem, então a alta de 1,5484 para
+  1,7845 é um denominador e não um achado. O que é comparável é o erro: **+66% relativo, intervalo 91%
+  mais largo**, sobre os mesmos contatos, os mesmos braços e o mesmo bot. Um número por cliente só é
+  tão estável quanto a premissa sobre o que é um cliente.
 
 ## Módulos
 
@@ -196,6 +235,7 @@ contatos de uma mesma pessoa. O mundo independente é, assim, um **controle**, n
 | [`svclab.routing`](src/svclab/routing/README.md) | Onde cortar o score do classificador quando os dois erros custam números diferentes de segundos humanos, o que a forma fechada desse corte assume sobre o score, e por qual objetivo o corte está sendo ajustado. |
 | [`svclab.experiment`](src/svclab/experiment/README.md) | Quantos contatos um teste de duas políticas precisa quando clientes repetem, e a qual nível de significância um teste que ignora o agrupamento roda de fato. |
 | [`svclab.population`](src/svclab/population/README.md) | Quanto valia a premissa de independência: quanto de uma correlação entre clientes sobrevive até o desfecho em que um teste roda, o que a parte sobrevivente custa, e o que custa a correção usual para ela. |
+| [`svclab.concentration`](src/svclab/concentration/README.md) | O que o agrupamento decide quando os clientes não contatam todos igualmente: quão desiguais os grupos realmente são, qual dos dois tamanhos de grupo entra num efeito de desenho, quem paga pelas falhas, e quanta precisão uma estimativa por cliente perde. |
 
 Todo README de módulo é bilíngue e traz uma seção **Premissas e limitações**, porque uma cifra sem suas
 premissas não é um resultado.
@@ -208,6 +248,7 @@ premissas não é um resultado.
 | [`examples/02_the_meter_that_was_noise.py`](examples/02_the_meter_that_was_noise.py) | O estudo do instrumento rodado antes da comparação: repetibilidade, reprodutibilidade, viés contra um padrão declarado, o fator exato pelo qual o painel encolhe toda diferença, o que isso custa em sessões, e contra o que um juiz automático seria validado. |
 | [`examples/03_three_numbers_nobody_priced.py`](examples/03_three_numbers_nobody_priced.py) | Os três padrões precificados: o limiar de roteamento varrido contra os dois objetivos e contra sua forma fechada, a fila com impaciência e com a realimentação de repetições resolvida até o ponto fixo, e o que custa um teste real de duas políticas quando clientes podem repetir. |
 | [`examples/04_the_customer_who_was_a_label.py`](examples/04_the_customer_who_was_a_label.py) | A mesma conta construída duas vezes a partir do mesmo ruído: se a correlação move algo já publicado, quanto dela chega ao desfecho, o que custa a uma comparação, quantas pessoas são falhadas duas vezes, e o que três erros padrão diferentes dizem sobre uma mesma diferença. |
+| [`examples/05_the_frequent_caller.py`](examples/05_the_frequent_caller.py) | Os mesmos contatos reagrupados em clientes que contatam em taxas diferentes, com os pesados correlacionados aos difíceis: a forma dos grupos, o efeito de desenho que retorna, quem paga por ele, e o que custa à precisão da estimativa da onda 1. |
 
 ## Instalar e rodar
 
@@ -219,12 +260,13 @@ python examples/01_the_containment_that_wasnt.py
 python examples/02_the_meter_that_was_noise.py
 python examples/03_three_numbers_nobody_priced.py
 python examples/04_the_customer_who_was_a_label.py
+python examples/05_the_frequent_caller.py
 ```
 
 ## Como as afirmações são mantidas honestas
 
-**248 testes, 100% de cobertura de linhas e de ramos.** 208 deles rodam em segundos e liberam cada push.
-Os 40 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
+**270 testes, 100% de cobertura de linhas e de ramos.** 225 deles rodam em segundos e liberam cada push.
+Os 45 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
 rodam o script de exemplo. Uma mudança que mova um número publicado quebra o build em vez de deixar o
 texto silenciosamente errado.
 
@@ -249,7 +291,7 @@ modo que a posição no stream depende de quantos valores são pedidos e não de
 responde. Essa regra é verificada contra o código-fonte, porque um repositório irmão publicou cifras
 que valiam numa máquina e mudavam numa instalação limpa.
 
-**E defeitos são registrados em vez de corrigidos em silêncio.** Vinte e um até aqui, em
+**E defeitos são registrados em vez de corrigidos em silêncio.** Vinte e cinco até aqui, em
 [`docs/ROADMAP.md`](docs/ROADMAP.md), cada um deles achado conectando os módulos, por um caso de
 controle ou verificando uma frase — nenhum lendo código. Dois valem a leitura. A sessão original cobrava
 um recontato como segundos extras em vez de como uma linha, o que torna o desvio aritmeticamente

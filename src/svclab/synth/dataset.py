@@ -7,9 +7,10 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from .config import CENTRE, SEED
+from .config import CENTRE, CONCENTRATION, SEED, ConcentrationProfile
 from .contacts import contacts, intent_truth
 from .customers import correlated_contacts, customer_components
+from .frequency import reassign_customers
 from .quality import quality_noise
 from .routing import routing_scores, scores_from
 
@@ -98,5 +99,40 @@ def correlated_dataset(data: Dataset) -> Dataset:
         panel_noise=data.panel_noise,
         judge_noise=data.judge_noise,
         routing_scores=scores_from(table, data.routing_scores["u_score"].to_numpy(dtype=float)),
+        customer_components=data.customer_components,
+    )
+
+
+def concentrated_dataset(
+    data: Dataset, concentration: ConcentrationProfile = CONCENTRATION
+) -> Dataset:
+    """The same contacts, grouped into customers who do not all contact equally often.
+
+    Nothing about a contact changes: not its difficulty, not its arm, not its handling time, not the
+    classifier's score. Only which contacts belong to one person, which means **every per-contact
+    figure in this repository is bit-for-bit identical in the returned dataset** and everything
+    measured per customer is not.
+
+    Compose it before :func:`correlated_dataset` when both are wanted, because the copula correlates
+    a customer's contacts and has to know who the customer is::
+
+        concentrated = concentrated_dataset(data)
+        both = correlated_dataset(concentrated)
+
+    Args:
+        data: A dataset from :func:`generate_dataset`.
+        concentration: The declared dispersion and difficulty correlation.
+
+    Returns:
+        A :class:`Dataset` whose contact table is regrouped. The intent truth and the routing scores
+        are carried over rather than recomputed, because neither depends on the customer.
+    """
+    table = reassign_customers(data.contacts, data.customer_components, concentration)
+    return Dataset(
+        contacts=table,
+        intent_truth=data.intent_truth,
+        panel_noise=data.panel_noise,
+        judge_noise=data.judge_noise,
+        routing_scores=data.routing_scores,
         customer_components=data.customer_components,
     )

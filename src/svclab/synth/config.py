@@ -362,3 +362,44 @@ class PopulationProfile:
 #: trait, applied to a comparison that turns on another, is one of the errors `svclab.population`
 #: exists to make visible.
 POPULATION = PopulationProfile(difficulty_correlation=0.25, patience_correlation=0.10)
+
+
+@dataclass(frozen=True)
+class ConcentrationProfile:
+    """How unequally customers contact, and whether the frequent ones are also the difficult ones.
+
+    Waves 1 to 4 assign every contact to a customer **uniformly**, so contact counts are Poisson
+    and the busiest customer in the account is busy by luck. Two things are wrong with that, and
+    they are separable:
+
+    - a real account's volume is concentrated. A minority of customers generate a large share of it;
+    - and that minority is not a random minority. The people who contact most are, on average,
+      the people whose problems are hardest, which is the whole reason a frequent caller is
+      expensive rather than merely frequent.
+
+    A customer's contact propensity here is log-normal — the percentile goes through the normal
+    quantile, is scaled by ``dispersion`` and exponentiated — and its latent value correlates with
+    the customer's own difficulty at exactly ``difficulty_correlation``.
+
+    Attributes:
+        dispersion: Standard deviation of the log propensity. Zero makes every customer equally
+            likely and is the control case; larger values concentrate the volume.
+        difficulty_correlation: Latent correlation between how often a customer contacts and how
+            hard their contacts are, in ``[0, 1]``.
+    """
+
+    dispersion: float
+    difficulty_correlation: float
+
+
+#: Declared, not fitted, and the two numbers are deliberately independent of each other: an account
+#: can be concentrated without its heavy users being difficult, and the point of the module that
+#: reads this is that the two assumptions cost different things.
+CONCENTRATION = ConcentrationProfile(dispersion=0.90, difficulty_correlation=0.40)
+
+#: The control: every customer equally likely to contact, and their rate unrelated to their
+#: difficulty. Wave 5's comparisons are read against this rather than against the world waves 1 to 4
+#: published, because reassigning contacts among the customers an account actually saw changes the
+#: cluster sizes on its own. What an estimator does with no concentration in the data is a fact
+#: about the estimator.
+EQUAL_RATES = ConcentrationProfile(dispersion=0.0, difficulty_correlation=0.0)

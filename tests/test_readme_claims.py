@@ -27,6 +27,7 @@ from svclab.capacity import (
     occupancy,
     service_level,
 )
+from svclab.concentration import burden_table, concentration_table, precision_table
 from svclab.containment import containment_table, deflection, selection_profile
 from svclab.experiment import intracluster_correlation, sizing_table
 from svclab.population import (
@@ -49,7 +50,16 @@ from svclab.quality import (
     youden,
 )
 from svclab.routing import best_by, calibrated_threshold, cost_curve, cost_of, defer_below
-from svclab.synth import CENTRE, POPULATION, QUALITY, ROUTING, Dataset
+from svclab.synth import (
+    CENTRE,
+    EQUAL_RATES,
+    POPULATION,
+    QUALITY,
+    ROUTING,
+    Dataset,
+    concentrated_dataset,
+    correlated_dataset,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -428,13 +438,21 @@ def test_the_design_effect_of_the_correlated_world_is_what_is_published(
     _contacts, treated, _control = _worlds(full, correlated)
     table = design_table(treated).set_index("world")
     assert float(table.loc["independent", "icc"]) == pytest.approx(-0.0126, abs=5e-5)
-    assert float(table.loc["independent", "design_effect"]) == pytest.approx(0.9879, abs=5e-5)
+    assert float(table.loc["independent", "design_effect"]) == pytest.approx(0.9806, abs=5e-5)
     assert math.isnan(float(table.loc["independent", "actual_alpha"]))
     assert float(table.loc["correlated", "icc"]) == pytest.approx(0.0448, abs=5e-5)
     assert float(table.loc["correlated", "mean_cluster_size"]) == pytest.approx(1.9637, abs=5e-5)
-    assert float(table.loc["correlated", "design_effect"]) == pytest.approx(1.0432, abs=5e-5)
-    assert float(table.loc["correlated", "sample_inflation"]) == pytest.approx(0.0432, abs=5e-5)
-    assert float(table.loc["correlated", "actual_alpha"]) == pytest.approx(0.0550, abs=5e-5)
+    assert float(table.loc["correlated", "effective_cluster_size"]) == pytest.approx(
+        2.5469, abs=5e-5
+    )
+    assert float(table.loc["correlated", "design_effect"]) == pytest.approx(1.0693, abs=5e-5)
+    assert float(table.loc["correlated", "sample_inflation"]) == pytest.approx(0.0693, abs=5e-5)
+    assert float(table.loc["correlated", "actual_alpha"]) == pytest.approx(0.0580, abs=5e-5)
+    # The number this table published before wave 5 corrected the cluster size it uses, kept in the
+    # frame and asserted here so the correction cannot quietly un-happen.
+    assert float(table.loc["correlated", "design_effect_at_mean"]) == pytest.approx(
+        1.0432, abs=5e-5
+    )
 
 
 def test_the_power_at_wave_threes_sizing_is_what_is_published(
@@ -443,7 +461,7 @@ def test_the_power_at_wave_threes_sizing_is_what_is_published(
     _contacts, treated, _control = _worlds(full, correlated)
     measured = float(design_table(treated).set_index("world").loc["correlated", "design_effect"])
     assert power_at(1.0, 0.0916, 0.6355, 405) == pytest.approx(0.8026, abs=5e-5)
-    assert power_at(measured, 0.0916, 0.6355, 405) == pytest.approx(0.7859, abs=5e-5)
+    assert power_at(measured, 0.0916, 0.6355, 405) == pytest.approx(0.7759, abs=5e-5)
     assert power_at(1.2891, 0.0916, 0.6355, 405) == pytest.approx(0.6970, abs=5e-5)
 
 
@@ -480,8 +498,8 @@ def test_the_three_standard_errors_are_what_is_published(
     assert float(table.loc["independent", "estimate"]) == pytest.approx(-0.2955, abs=5e-5)
     assert float(table.loc["correlated", "estimate"]) == pytest.approx(-0.2956, abs=5e-5)
     published = {
-        "independent": (0.003889, 0.004406, 0.003867, 1.1330, 0.9943),
-        "correlated": (0.003886, 0.004427, 0.003913, 1.1392, 1.0071),
+        "independent": (0.003889, 0.004406, 0.003853, 1.1330, 0.9908),
+        "correlated": (0.003886, 0.004427, 0.003929, 1.1392, 1.0113),
     }
     for world, (naive, cluster, corrected, cluster_ratio, corrected_ratio) in published.items():
         row = table.loc[world]
@@ -492,7 +510,118 @@ def test_the_three_standard_errors_are_what_is_published(
         assert float(row["corrected_ratio"]) == pytest.approx(corrected_ratio, abs=5e-5), world
     loss = float(table.loc["independent", "cluster_mean_ratio"]) - 1.0
     gain = float(table.loc["correlated", "corrected_ratio"]) - 1.0
-    assert loss / gain == pytest.approx(19.0, abs=0.5)
+    assert loss / gain == pytest.approx(11.8, abs=0.5)
+
+
+# --- svclab.concentration -----------------------------------------------------------------------
+
+
+def _regrouped(full: Dataset) -> tuple[dict[str, pd.DataFrame], ...]:
+    """The two worlds wave 5 compares, and the two arms of each."""
+    worlds = {
+        "equal rates": correlated_dataset(concentrated_dataset(full, EQUAL_RATES)).contacts,
+        "concentrated": correlated_dataset(concentrated_dataset(full)).contacts,
+    }
+    treated = {name: table[~table["holdout"]] for name, table in worlds.items()}
+    outcomes = {name: run(table, THREE_TURNS) for name, table in treated.items()}
+    control = {name: run(table[table["holdout"]], HUMAN_ONLY) for name, table in worlds.items()}
+    return treated, outcomes, control
+
+
+def test_the_shape_of_the_regrouped_account_is_what_is_published(full: Dataset) -> None:
+    published = {
+        "equal rates": (13087, 2.4300, 3.2272, 0.3039, 0.2197, 0.0004),
+        "concentrated": (10640, 2.9889, 5.7454, 0.4195, 0.3161, 0.1595),
+    }
+    treated, _outcomes, _control = _regrouped(full)
+    table = concentration_table(treated).set_index("world")
+    for world, (customers, mean, effective, inequality, decile, correlation) in published.items():
+        row = table.loc[world]
+        assert int(row["customers"]) == customers, world
+        assert int(row["contacts"]) == 31802, world
+        assert float(row["mean_cluster_size"]) == pytest.approx(mean, abs=5e-5), world
+        assert float(row["effective_cluster_size"]) == pytest.approx(effective, abs=5e-5), world
+        assert float(row["gini"]) == pytest.approx(inequality, abs=5e-5), world
+        assert float(row["top_decile_share"]) == pytest.approx(decile, abs=5e-5), world
+        assert float(row["frequency_difficulty_correlation"]) == pytest.approx(
+            correlation, abs=5e-5
+        ), world
+    assert float(table.loc["concentrated", "effective_cluster_size"]) / float(
+        table.loc["equal rates", "effective_cluster_size"]
+    ) - 1.0 == pytest.approx(0.78, abs=5e-3)
+    assert float(table.loc["concentrated", "mean_cluster_size"]) / float(
+        table.loc["equal rates", "mean_cluster_size"]
+    ) - 1.0 == pytest.approx(0.23, abs=5e-3)
+
+
+def test_the_design_effect_of_the_concentrated_world_is_what_is_published(full: Dataset) -> None:
+    published = {
+        "equal rates": (0.0417, 2.4300, 3.2272, 1.0928, 1.0596, 0.0608),
+        "concentrated": (0.0473, 2.9889, 5.7454, 1.2246, 1.0941, 0.0765),
+    }
+    _treated, outcomes, _control = _regrouped(full)
+    table = design_table(outcomes).set_index("world")
+    for world, (icc, mean, effective, effect, at_mean, alpha) in published.items():
+        row = table.loc[world]
+        assert float(row["icc"]) == pytest.approx(icc, abs=5e-5), world
+        assert float(row["mean_cluster_size"]) == pytest.approx(mean, abs=5e-5), world
+        assert float(row["effective_cluster_size"]) == pytest.approx(effective, abs=5e-5), world
+        assert float(row["design_effect"]) == pytest.approx(effect, abs=5e-5), world
+        assert float(row["design_effect_at_mean"]) == pytest.approx(at_mean, abs=5e-5), world
+        assert float(row["actual_alpha"]) == pytest.approx(alpha, abs=5e-5), world
+    measured = float(table.loc["concentrated", "design_effect"])
+    assert measured / 1.2891 == pytest.approx(0.95, abs=5e-3)
+    assert float(table.loc["concentrated", "sample_inflation"]) == pytest.approx(0.2246, abs=5e-5)
+    at_mean = float(table.loc["concentrated", "design_effect_at_mean"]) - 1.0
+    assert at_mean == pytest.approx(0.0941, abs=5e-5)
+
+
+def test_who_pays_for_the_regrouping_is_what_is_published(full: Dataset) -> None:
+    published = {
+        "equal rates": (0.3352, 0.6358, 0.2197, 0.2201, 0.2201, 794),
+        "concentrated": (0.3684, 0.6205, 0.3161, 0.3265, 0.3541, 1305),
+    }
+    treated, outcomes, _control = _regrouped(full)
+    table = burden_table(treated, outcomes).set_index("world")
+    for world, (difficulty, resolution, volume, unresolved, hours, repeats) in published.items():
+        row = table.loc[world]
+        assert float(row["difficulty_per_contact"]) == pytest.approx(difficulty, abs=5e-5), world
+        assert float(row["resolution_rate"]) == pytest.approx(resolution, abs=5e-5), world
+        assert float(row["top_decile_volume"]) == pytest.approx(volume, abs=5e-5), world
+        assert float(row["top_decile_unresolved"]) == pytest.approx(unresolved, abs=5e-5), world
+        assert float(row["top_decile_human_hours"]) == pytest.approx(hours, abs=5e-5), world
+        assert int(row["customers_failed_three_times"]) == repeats, world
+    control, heavy = table.loc["equal rates"], table.loc["concentrated"]
+    points = float(control["resolution_rate"]) - float(heavy["resolution_rate"])
+    assert points * 100.0 == pytest.approx(1.53, abs=5e-3)
+    assert float(heavy["difficulty_per_contact"]) / float(
+        control["difficulty_per_contact"]
+    ) - 1.0 == pytest.approx(0.099, abs=5e-4)
+    assert int(heavy["customers_failed_three_times"]) / int(
+        control["customers_failed_three_times"]
+    ) - 1.0 == pytest.approx(0.64, abs=5e-3)
+
+
+def test_the_precision_of_the_business_cases_estimate_is_what_is_published(full: Dataset) -> None:
+    published = {
+        "equal rates": (13087, 1.5484, 0.0381, 0.0246, 0.1495),
+        "concentrated": (10640, 1.7845, 0.0730, 0.0409, 0.2862),
+    }
+    _treated, outcomes, control = _regrouped(full)
+    table = precision_table(outcomes, control).set_index("world")
+    for world, (customers, deflected, error, relative, width) in published.items():
+        row = table.loc[world]
+        assert int(row["customers"]) == customers, world
+        assert float(row["deflected_per_customer"]) == pytest.approx(deflected, abs=5e-5), world
+        assert float(row["standard_error"]) == pytest.approx(error, abs=5e-5), world
+        assert float(row["relative_error"]) == pytest.approx(relative, abs=5e-5), world
+        assert float(row["interval_width"]) == pytest.approx(width, abs=5e-5), world
+    assert float(table.loc["concentrated", "relative_error"]) / float(
+        table.loc["equal rates", "relative_error"]
+    ) - 1.0 == pytest.approx(0.66, abs=5e-3)
+    assert float(table.loc["concentrated", "interval_width"]) / float(
+        table.loc["equal rates", "interval_width"]
+    ) - 1.0 == pytest.approx(0.91, abs=5e-3)
 
 
 # --- The example -------------------------------------------------------------------------------

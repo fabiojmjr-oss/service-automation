@@ -165,23 +165,63 @@ of one person. The independent world is therefore a **control**, not a baseline.
   resolution is a coin whose bias is correlated, not a correlated coin, and at a resolution rate near
   0.64 the coin is most of the variance. The rule that follows is short: **estimate the correlation of
   the outcome you are testing, never of the trait you believe drives it.**
-- **Which makes wave 3's own alarm seven times too loud on this account.** The measured design effect
-  is **1.0432** — 4.32% more sample, and a nominal 5% test really running at **5.50%** — against the
+- **Which makes wave 3's own alarm four times too loud on this account.** The measured design effect
+  is **1.0693** — 6.93% more sample, and a nominal 5% test really running at **5.80%** — against the
   1.2891 and 8.43% wave 3 priced at a declared 0.30. At wave 3's sizing of 405 contacts per arm the
-  power is 0.8026 if contacts are independent, **0.7859** at the measured effect and 0.6970 at the
-  declared one: **1.7 points of power, not 11.** The effect is real, measurable and modest, because a
+  power is 0.8026 if contacts are independent, **0.7759** at the measured effect and 0.6970 at the
+  declared one: **2.7 points of power, not 11.** The effect is real, measurable and modest, because a
   design effect is a product of two factors and this account's clusters average two contacts.
 - **And the KPI is blind to the thing the operation feels.** Among customers with exactly two
   contacts, the share failed **both** times rises from 0.1219 to **0.1406** — 98 more people, on the
   same volume, while the resolution rate moves by 0.0002. A resolution rate is contact-weighted; a
   complaint, a churn and a regulator's letter are customer-weighted. The two agree exactly when a
   customer is a label.
-- **The correction most analysts reach for costs nineteen times the error it corrects.** Averaging
+- **The correction most analysts reach for costs twelve times the error it corrects.** Averaging
   each customer's average inflates the standard error by **13.3% in the independent world** — where
   there is no correlation at all to correct — because weighting unequal clusters equally discards
-  information. The correlation's own contribution to the same standard error is **0.7%**. The
+  information. The correlation's own contribution to the same standard error is **1.1%**. The
   independent world's row is the only reason that is visible, which is the argument for keeping a
   control world rather than a better story.
+
+## And the customer who contacted most was busy by accident
+
+The world above gives every customer a difficulty and a patience of their own, and leaves their
+**rate** alone: each contact still picks a customer uniformly, so contact counts are Poisson with a
+mean below two and the busiest customer in the account is busy by luck. A real account breaks that
+twice over — its volume is **concentrated**, and the minority generating it is **not random**, because
+the people who contact most are on average the people whose problems are hardest.
+
+So the same 31,802 contacts are regrouped into customers whose contact rate is log-normal and
+correlated with their own difficulty at a declared 0.40. The regrouping reuses the uniform that chose
+the customer in the first place and never crosses an arm, so **every per-contact figure stays
+identical, bit for bit** — asserted exactly, not to a tolerance. The control is the same regrouping at
+**equal rates**, because reassigning contacts among the customers an account actually saw enlarges the
+clusters on its own.
+
+- **The same volume arrives from 10,640 people instead of 13,087, and the mean barely notices.** Mean
+  contacts per customer rise 23%, from 2.43 to 2.99. The **effective** cluster size — the
+  size-weighted mean, which is the quantity a design effect is computed from — rises **78%**, from
+  3.23 to **5.75**. Concentration is a statement about the variance of the cluster sizes.
+- **Which is where wave 3's alarm comes back: the design effect is 1.2246, or 95% of the 1.2891 wave 3
+  declared as its serious case.** Wave 4 measured 1.0693 and called that alarm four times too loud — in
+  a world where everybody contacts at the same rate, which it had assumed rather than chosen. Two wrong
+  assumptions in opposite directions whose product was close to right, and a nominal 5% test here is
+  really running at **7.65%**.
+- **The cost concentrates faster than the volume.** In the control the heaviest tenth of customers
+  generates 21.97% of the contacts, 22.01% of the failures and 22.01% of the human hours — one number,
+  because being heavy says nothing about being difficult. Concentrated: 31.6% of the volume, 32.7% of
+  the failures and **35.4% of the hours**. And the population failed three times or more goes from 794
+  customers to **1,305**.
+- **The resolution rate falls 1.53 points with no change of policy at all.** The distribution of
+  difficulty **per customer** is unchanged; the distribution **per contact** is not, because the
+  difficult customers now send more contacts each. Mean difficulty per contact rises 9.9%. The queue's
+  mix of difficulty is a property of who calls, not only of who they are — and no business case models
+  it.
+- **And wave 1's central estimate loses a third of its precision.** Deflection per customer is not
+  comparable across worlds that disagree about how many customers there are, so its rise from 1.5484
+  to 1.7845 is a denominator rather than a finding. What is comparable is the error: **+66% relative,
+  a 91% wider interval**, on the same contacts, the same arms and the same bot. A per-customer number
+  is only as stable as the assumption about who a customer is.
 
 ## Modules
 
@@ -195,6 +235,7 @@ of one person. The independent world is therefore a **control**, not a baseline.
 | [`svclab.routing`](src/svclab/routing/README.md) | Where to cut the classifier's score when the two mistakes cost different numbers of human seconds, what the closed form for that cut assumes about the score, and which objective the cut is being tuned on. |
 | [`svclab.experiment`](src/svclab/experiment/README.md) | How many contacts a test of two policies needs once customers repeat, and what significance level a test that ignores the clustering is really running at. |
 | [`svclab.population`](src/svclab/population/README.md) | What the independence assumption was worth: how much of a correlation between customers survives into the outcome a test is run on, what the surviving part costs, and what the usual correction for it costs instead. |
+| [`svclab.concentration`](src/svclab/concentration/README.md) | What grouping decides once customers do not all contact equally often: how unequal the clusters really are, which of the two cluster sizes belongs in a design effect, who pays for the failures, and how much precision a per-customer estimate loses. |
 
 Every module README is bilingual and carries an **Assumptions and limitations** section, because a
 figure without its assumptions is not a result.
@@ -207,6 +248,7 @@ figure without its assumptions is not a result.
 | [`examples/02_the_meter_that_was_noise.py`](examples/02_the_meter_that_was_noise.py) | The gauge study run before the comparison: repeatability, reproducibility, bias against a declared standard, the exact factor by which the panel shrinks every difference, what that costs in sessions, and what an automated judge would be validated against. |
 | [`examples/03_three_numbers_nobody_priced.py`](examples/03_three_numbers_nobody_priced.py) | The three defaults priced: the routing threshold swept against both objectives and against its closed form, the queue with impatience and with the repeat feedback solved to its fixed point, and what a real test of two policies costs once customers are allowed to repeat. |
 | [`examples/04_the_customer_who_was_a_label.py`](examples/04_the_customer_who_was_a_label.py) | The same account built twice from the same noise: whether the correlation moves anything already published, how much of it reaches the outcome, what it costs a comparison, how many people are failed twice, and what three different standard errors say about one difference. |
+| [`examples/05_the_frequent_caller.py`](examples/05_the_frequent_caller.py) | The identical contacts regrouped into customers who contact at different rates, with the heavy users correlated with the difficult ones: the shape of the clusters, the design effect that returns, who pays for it, and what it costs the precision of wave 1's estimate. |
 
 ## Install and run
 
@@ -218,12 +260,13 @@ python examples/01_the_containment_that_wasnt.py
 python examples/02_the_meter_that_was_noise.py
 python examples/03_three_numbers_nobody_priced.py
 python examples/04_the_customer_who_was_a_label.py
+python examples/05_the_frequent_caller.py
 ```
 
 ## How the claims are kept honest
 
-**248 tests, 100% statement and branch coverage.** 208 of them run in seconds and gate every push. The
-remaining 40 re-derive, from the generator, every figure quoted in every README on this repository,
+**270 tests, 100% statement and branch coverage.** 225 of them run in seconds and gate every push. The
+remaining 45 re-derive, from the generator, every figure quoted in every README on this repository,
 and run the example script. A change that moves a published number breaks the build instead of leaving
 the text quietly wrong.
 
@@ -248,7 +291,7 @@ position depends on how many values are asked for and not on which library versi
 is checked against the source, because a sibling repository published figures that held on one machine
 and moved on a clean install.
 
-**And defects are recorded rather than quietly fixed.** Twenty-one so far, in
+**And defects are recorded rather than quietly fixed.** Twenty-five so far, in
 [`docs/ROADMAP.md`](docs/ROADMAP.md), every one of them found by connecting the modules, by a control
 case or by verifying a sentence — none by reading code. Two are worth reading. The original session
 charged a repeat contact as extra seconds rather than as a row, which makes deflection arithmetically

@@ -11,6 +11,7 @@ from .design import (
     actual_alpha,
     contacts_for_difference,
     design_effect,
+    effective_cluster_size,
     intracluster_correlation,
     sizing_table,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "actual_alpha",
     "contacts_for_difference",
     "design_effect",
+    "effective_cluster_size",
     "intracluster_correlation",
     "sizing_table",
 ]

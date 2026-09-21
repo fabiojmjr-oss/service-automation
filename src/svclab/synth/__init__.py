@@ -12,6 +12,8 @@ their policy and by nothing else.
 
 from .config import (
     CENTRE,
+    CONCENTRATION,
+    EQUAL_RATES,
     GRADERS,
     INTENTS,
     JUDGE,
@@ -20,6 +22,7 @@ from .config import (
     ROUTING,
     SEED,
     CentreProfile,
+    ConcentrationProfile,
     GraderProfile,
     IntentProfile,
     PopulationProfile,
@@ -34,7 +37,8 @@ from .contacts import (
     intent_truth,
 )
 from .customers import CUSTOMER_COLUMNS, blend, correlated_contacts, customer_components
-from .dataset import Dataset, correlated_dataset, generate_dataset
+from .dataset import Dataset, concentrated_dataset, correlated_dataset, generate_dataset
+from .frequency import propensity, reassign_customers
 from .quality import JUDGE_NOISE_COLUMNS, PANEL_NOISE_COLUMNS, quality_noise
 from .routing import ROUTING_SCORE_COLUMNS, accuracy_curve, routing_scores
 
@@ -44,7 +48,9 @@ __all__ = [
     "GRADERS",
     "INTENTS",
     "INTENT_TRUTH_COLUMNS",
+    "CONCENTRATION",
     "CUSTOMER_COLUMNS",
+    "EQUAL_RATES",
     "JUDGE",
     "JUDGE_NOISE_COLUMNS",
     "POPULATION",
@@ -55,6 +61,7 @@ __all__ = [
     "SEED",
     "TRUTH_DRAW_COLUMNS",
     "CentreProfile",
+    "ConcentrationProfile",
     "Dataset",
     "GraderProfile",
     "IntentProfile",
@@ -63,12 +70,15 @@ __all__ = [
     "RoutingProfile",
     "accuracy_curve",
     "blend",
+    "concentrated_dataset",
     "contacts",
     "correlated_contacts",
     "correlated_dataset",
     "customer_components",
     "generate_dataset",
     "intent_truth",
+    "propensity",
     "quality_noise",
+    "reassign_customers",
     "routing_scores",
 ]

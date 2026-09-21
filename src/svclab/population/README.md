@@ -104,30 +104,39 @@ clustered".
 
 ## Result 3: what the surviving part costs, against what wave 3 assumed
 
-| World | ICC | Mean cluster | Design effect | Extra sample | Nominal α | Actual α |
-| --- | --- | --- | --- | --- | --- | --- |
-| independent | −0.0126 | 1.9637 | 0.9879 | — | 0.05 | **no answer** |
-| correlated | 0.0448 | 1.9637 | **1.0432** | **+4.32%** | 0.05 | **0.0550** |
-| wave 3's declared 0.30 | 0.3000 | 1.9637 | 1.2891 | +28.91% | 0.05 | 0.0843 |
+| World | ICC | Mean cluster | Effective cluster | Design effect | Extra sample | Nominal α | Actual α |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| independent | −0.0126 | 1.9637 | 2.5469 | 0.9806 | — | 0.05 | **no answer** |
+| correlated | 0.0448 | 1.9637 | 2.5469 | **1.0693** | **+6.93%** | 0.05 | **0.0580** |
+| wave 3's declared 0.30 | 0.3000 | 1.9637 | — | 1.2891 | +28.91% | 0.05 | 0.0843 |
+
+**Read the two cluster columns before the rest.** Kish's inflation is `1 + (m − 1)·rho` for clusters
+of one size; with unequal sizes the quantity that belongs in it is the **size-weighted** mean,
+`sum(m²)/sum(m)`, because a randomly chosen contact sits in a cluster of that expected size. Here
+that is 2.5469 against a plain mean of 1.9637. The first version of this table used the mean and
+published a design effect of **1.0432**; the corrected figure is 1.0693, and
+`design_effect_at_mean` keeps the old number in the frame so the size of the mistake stays visible.
+It is recorded in [`docs/ROADMAP.md`](../../../docs/ROADMAP.md).
 
 The independent row returns **no error rate at all**, and that is wave 3's function working as
 specified: a measured design effect below one is a negative correlation estimate, which is not an
 inflation, and `actual_alpha` refuses it rather than clipping it to 0.05. A table that printed the
 nominal value there would be inventing a number.
 
-And the correlated row is **seven times smaller than the scenario wave 3 priced**. At wave 3's own
-sizing of 405 contacts per arm, the power of the comparison it sized is:
+And the correlated row's extra sample is **four times smaller than the scenario wave 3 priced**. At
+wave 3's own sizing of 405 contacts per arm, the power of the comparison it sized is:
 
 | | Power at 405 contacts per arm |
 | --- | --- |
 | independent contacts | 0.8026 |
-| at the **measured** design effect | **0.7859** |
+| at the **measured** design effect | **0.7759** |
 | at wave 3's declared 0.30 | 0.6970 |
 
-So wave 3's alarm was right in **shape** and wrong in **size** on this account: the correction is
-1.7 points of power, not 11. Both numbers matter, and the honest statement is the one wave 3 could
-not make — the effect is real, measurable, and modest, because a design effect is a product of two
-factors and this account's clusters average **two**.
+So wave 3's alarm was right in **shape** and overstated in **size** on this account: the correction
+is 2.7 points of power, not 11. Both numbers matter, and the honest statement is the one wave 3 could
+not make — the effect is real, measurable and modest, because a design effect is a product of two
+factors and this account's clusters are small. How small is itself an assumption, and
+[`svclab.concentration`](../concentration/README.md) is what happens when it is relaxed.
 
 ## Result 4: the same person, failed twice
 
@@ -156,17 +165,17 @@ Three standard errors on one difference — the treated arm's resolution rate ag
 
 | World | Estimate | Naive | Cluster mean | Corrected | Cluster-mean ratio | Corrected ratio |
 | --- | --- | --- | --- | --- | --- | --- |
-| independent | −0.2955 | 0.003889 | 0.004406 | 0.003867 | **1.1330** | 0.9943 |
-| correlated | −0.2956 | 0.003886 | 0.004427 | 0.003913 | **1.1392** | 1.0071 |
+| independent | −0.2955 | 0.003889 | 0.004406 | 0.003853 | **1.1330** | 0.9908 |
+| correlated | −0.2956 | 0.003886 | 0.004427 | 0.003929 | **1.1392** | 1.0113 |
 
 Read the independent row first. **Averaging customer averages inflates the standard error by 13.3%
 in a world with no correlation in it whatever.** That is not a clustering correction, it is an
 efficiency loss wearing one's clothes: aggregating to unequal-sized clusters and weighting them
 equally discards information about how many contacts each average was built from.
 
-The correlation's own contribution, on the same data, is the **0.7%** in the corrected column. So the
-analyst who "handles the clustering" by averaging per customer pays about **nineteen times** the
-error they were correcting for.
+The correlation's own contribution, on the same data, is the **1.1%** in the corrected column. So the
+analyst who "handles the clustering" by averaging per customer pays about **twelve times** the error
+they were correcting for.
 
 The corrected error is smaller than the cluster-mean one because it multiplies the naive error by the
 square root of the **pooled** design effect — pooled across the two arms, and the holdout arm is
@@ -327,30 +336,40 @@ intuição aplicada é "clientes repetem, então meus dados devem estar profunda
 
 ## Resultado 3: o que a parte sobrevivente custa, contra o que a onda 3 assumiu
 
-| Mundo | ICC | Grupo médio | Efeito de desenho | Amostra extra | α nominal | α real |
-| --- | --- | --- | --- | --- | --- | --- |
-| independente | −0,0126 | 1,9637 | 0,9879 | — | 0,05 | **sem resposta** |
-| correlacionado | 0,0448 | 1,9637 | **1,0432** | **+4,32%** | 0,05 | **0,0550** |
-| os 0,30 declarados na onda 3 | 0,3000 | 1,9637 | 1,2891 | +28,91% | 0,05 | 0,0843 |
+| Mundo | ICC | Grupo médio | Grupo efetivo | Efeito de desenho | Amostra extra | α nominal | α real |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| independente | −0,0126 | 1,9637 | 2,5469 | 0,9806 | — | 0,05 | **sem resposta** |
+| correlacionado | 0,0448 | 1,9637 | 2,5469 | **1,0693** | **+6,93%** | 0,05 | **0,0580** |
+| os 0,30 declarados na onda 3 | 0,3000 | 1,9637 | — | 1,2891 | +28,91% | 0,05 | 0,0843 |
+
+**Leia as duas colunas de grupo antes do resto.** A inflação de Kish é `1 + (m − 1)·rho` para grupos
+de um mesmo tamanho; com tamanhos desiguais a quantidade que entra ali é a média **ponderada por
+tamanho**, `sum(m²)/sum(m)`, porque um contato escolhido ao acaso está num grupo desse tamanho
+esperado. Aqui isso é 2,5469 contra uma média simples de 1,9637. A primeira versão desta tabela usou
+a média e publicou um efeito de desenho de **1,0432**; a cifra corrigida é 1,0693, e
+`design_effect_at_mean` mantém o número antigo no frame para que o tamanho do erro continue visível.
+Está registrado em [`docs/ROADMAP.md`](../../../docs/ROADMAP.md).
 
 A linha independente devolve **nenhuma taxa de erro**, e isso é a função da onda 3 funcionando como
 especificada: um efeito de desenho medido abaixo de um é uma estimativa negativa de correlação, o que
 não é inflação, e `actual_alpha` a recusa em vez de truncá-la em 0,05. Uma tabela que imprimisse ali
 o valor nominal estaria inventando um número.
 
-E a linha correlacionada é **sete vezes menor que o cenário que a onda 3 precificou**. No próprio
-dimensionamento da onda 3, de 405 contatos por braço, o poder da comparação que ela dimensionou é:
+E a amostra extra da linha correlacionada é **quatro vezes menor que o cenário que a onda 3
+precificou**. No próprio dimensionamento da onda 3, de 405 contatos por braço, o poder da comparação
+que ela dimensionou é:
 
 | | Poder a 405 contatos por braço |
 | --- | --- |
 | contatos independentes | 0,8026 |
-| no efeito de desenho **medido** | **0,7859** |
+| no efeito de desenho **medido** | **0,7759** |
 | nos 0,30 declarados da onda 3 | 0,6970 |
 
-Então o alarme da onda 3 estava certo na **forma** e errado no **tamanho** nesta conta: a correção
-são 1,7 pontos de poder, não 11. Os dois números importam, e a afirmação honesta é a que a onda 3 não
+Então o alarme da onda 3 estava certo na **forma** e exagerado no **tamanho** nesta conta: a correção
+são 2,7 pontos de poder, não 11. Os dois números importam, e a afirmação honesta é a que a onda 3 não
 podia fazer — o efeito é real, mensurável e modesto, porque um efeito de desenho é produto de dois
-fatores e os grupos desta conta têm em média **dois** contatos.
+fatores e os grupos desta conta são pequenos. O quão pequenos é, ele mesmo, uma premissa — e
+[`svclab.concentration`](../concentration/README.md) é o que acontece quando ela é relaxada.
 
 ## Resultado 4: a mesma pessoa, falhada duas vezes
 
@@ -379,17 +398,17 @@ Três erros padrão sobre uma diferença — a taxa de resolução do braço tra
 
 | Mundo | Estimativa | Ingênuo | Média por cliente | Corrigido | Razão da média | Razão do corrigido |
 | --- | --- | --- | --- | --- | --- | --- |
-| independente | −0,2955 | 0,003889 | 0,004406 | 0,003867 | **1,1330** | 0,9943 |
-| correlacionado | −0,2956 | 0,003886 | 0,004427 | 0,003913 | **1,1392** | 1,0071 |
+| independente | −0,2955 | 0,003889 | 0,004406 | 0,003853 | **1,1330** | 0,9908 |
+| correlacionado | −0,2956 | 0,003886 | 0,004427 | 0,003929 | **1,1392** | 1,0113 |
 
 Leia a linha independente primeiro. **Fazer média de médias por cliente infla o erro padrão em 13,3%
 num mundo sem correlação alguma.** Isso não é correção de agrupamento, é perda de eficiência vestida
 de correção: agregar em grupos de tamanhos diferentes e pesá-los igualmente descarta a informação de
 quantos contatos formaram cada média.
 
-A contribuição da própria correlação, nos mesmos dados, são os **0,7%** da coluna do corrigido. Ou
-seja: quem "trata o agrupamento" tirando média por cliente paga cerca de **dezenove vezes** o erro
-que estava corrigindo.
+A contribuição da própria correlação, nos mesmos dados, são os **1,1%** da coluna do corrigido. Ou
+seja: quem "trata o agrupamento" tirando média por cliente paga cerca de **doze vezes** o erro que
+estava corrigindo.
 
 O erro corrigido é menor que o da média por cliente porque multiplica o erro ingênuo pela raiz do
 efeito de desenho **combinado** — combinado entre os dois braços, e o braço holdout é `human-only`,

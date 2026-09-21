@@ -44,10 +44,11 @@ CONTACT_COLUMNS = (
     "u_seconds",
     "u_patience",
     "u_human",
+    "u_customer",
 )
 
 #: The retained uniforms, and the four of them that are truth by another name.
-DRAW_COLUMNS = ("u_bot", "u_self_serve", "u_seconds", "u_patience", "u_human")
+DRAW_COLUMNS = ("u_bot", "u_self_serve", "u_seconds", "u_patience", "u_human", "u_customer")
 TRUTH_DRAW_COLUMNS = ("u_bot", "u_self_serve", "u_seconds", "u_human")
 
 #: Columns of the per-intent truth table.
@@ -92,7 +93,10 @@ def contacts(rng: np.random.Generator, centre: CentreProfile = CENTRE) -> pd.Dat
 
     which = categorical(rng, count, shares)
     difficulty = beta(rng, count, centre.difficulty_alpha, centre.difficulty_beta)
-    customer = np.asarray(uniform(rng, count) * centre.customers, dtype=int)
+    # Kept, like the uniforms below: which customer a contact belongs to is a structural assumption
+    # too, and wave 5 replays this draw against customers who do not all contact equally often.
+    u_customer = uniform(rng, count)
+    customer = np.asarray(u_customer * centre.customers, dtype=int)
     arrival_hour = uniform(rng, count) * centre.days * 24.0
 
     # The holdout is drawn per customer and then joined on, so every contact of a customer lands in
@@ -131,6 +135,7 @@ def contacts(rng: np.random.Generator, centre: CentreProfile = CENTRE) -> pd.Dat
             "u_seconds": u_seconds,
             "u_patience": u_patience,
             "u_human": u_human,
+            "u_customer": u_customer,
         }
     )
     return outcomes_from_difficulty(frame, which, centre)

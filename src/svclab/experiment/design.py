@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import pandas as pd
 from scipy import stats
 
@@ -66,6 +67,37 @@ def design_effect(mean_cluster_size: float, icc: float) -> float:
     if not -1.0 <= icc <= 1.0:
         raise ValueError(f"a correlation has to be between minus one and one, got {icc}")
     return 1.0 + (mean_cluster_size - 1.0) * icc
+
+
+def effective_cluster_size(sizes: pd.Series | pd.Index | list[float]) -> float:
+    """The cluster size a design effect is computed at when the clusters are not equal.
+
+    Kish's inflation is ``1 + (m - 1) * rho`` for clusters of equal size ``m``. With unequal sizes
+    the quantity that belongs in it is not the mean but the **size-weighted mean**,
+    ``sum(m^2) / sum(m)``: a randomly chosen *contact* sits in a cluster of that expected size, and
+    it is contacts that carry the correlated information. The two agree exactly when the clusters
+    are all one size and diverge with the variance of the sizes - which is why an account with
+    frequent callers is more clustered than its average suggests.
+
+    Waves 3 and 4 passed the mean. That is recorded as a defect in ``docs/ROADMAP.md``; this
+    function is the correction.
+
+    Args:
+        sizes: One size per cluster.
+
+    Returns:
+        The size-weighted mean size.
+
+    Raises:
+        ValueError: If there are no clusters, or their sizes sum to zero.
+    """
+    values = np.asarray(list(sizes), dtype=float)
+    if values.size == 0:
+        raise ValueError("an effective cluster size needs at least one cluster")
+    total = float(values.sum())
+    if total <= 0.0:
+        raise ValueError("cluster sizes that sum to zero have no effective size")
+    return float((values**2).sum() / total)
 
 
 def intracluster_correlation(frame: pd.DataFrame, cluster: str, outcome: str) -> float:

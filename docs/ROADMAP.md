@@ -261,6 +261,72 @@ no correlation estimate is more expensive than the problem. Only the control wor
    the repeat is the useful part: a refactor that makes a function's job smaller is exactly when a
    wrapper becomes ornamental, and judgement did not notice either time.
 
+## Wave 5 — the frequent caller who was busy by accident *(complete)*
+
+Wave 4 gave a customer traits and left their contact **rate** alone. Every contact still picked a
+customer uniformly, so counts were Poisson with a mean below two and the busiest customer in the
+account was busy by luck. This wave regroups the identical contacts into customers who do not all
+contact equally often, with the heavy users correlated with the difficult ones.
+
+| Delivered | Where |
+| --- | --- |
+| The uniform that chose a customer kept in the contact table, so the choice can be replayed | `synth.contacts` |
+| A per-customer contact propensity, log-normal and correlated with that customer's own difficulty | `synth.propensity` |
+| The regrouping itself, arm by arm, with every trait and every arm preserved | `synth.reassign_customers`, `synth.concentrated_dataset` |
+| The declared control: the same regrouping at equal rates | `synth.EQUAL_RATES` |
+| The size-weighted mean cluster size, which is the one a design effect is computed from | `experiment.effective_cluster_size` |
+| How unequal the account is, and whether its heavy users are its difficult ones | `concentration.concentration_table` |
+| Who pays: the top decile's share of volume, of failures and of human hours | `concentration.burden_table` |
+| What a per-customer estimate loses in precision | `concentration.precision_table` |
+
+**The thread from wave 4.** Wave 4 concluded that wave 3's clustering alarm was four times too loud on
+this account. It measured that in a world where everybody contacts at the same rate — an assumption it
+inherited rather than chose. Relax it and the design effect is **1.2246**, which is 95% of the 1.2891
+wave 3 declared as its serious case. Two wrong assumptions in opposite directions, and their product
+was close to right. The lesson is not that wave 3 was vindicated; it is that a design effect has two
+inputs and this family of repositories had been arguing about one of them.
+
+The result I did not expect is Result 3 of
+[`svclab.concentration`](../src/svclab/concentration/README.md). The regrouping is exactly invariant
+per contact — asserted as an identity, not a tolerance — and yet the resolution rate falls **1.53
+points** once the traits are correlated within the new customers. The distribution of difficulty per
+*customer* does not move; the distribution per *contact* does, because the difficult customers now send
+more contacts each. A queue's mix of difficulty is a property of who calls, not only of who they are,
+and I had published the invariance one wave earlier without noticing it had a boundary.
+
+### Defects found and recorded
+
+1. **Waves 3 and 4 put the wrong cluster size into the design effect.** Kish's inflation is
+   ``1 + (m - 1) * rho`` for clusters of one size; with unequal sizes the quantity that belongs in it is
+   the **size-weighted** mean, ``sum(m^2) / sum(m)``, because a randomly chosen contact sits in a
+   cluster of that expected size. Wave 4 passed the plain mean and published a design effect of
+   **1.0432**; the corrected figure is **1.0693**, the actual error rate moves from 0.0550 to 0.0580,
+   the power at wave 3's sizing from 0.7859 to 0.7759, and the standard-error comparison's headline
+   from nineteen times to twelve. In the concentrated world the same mistake would report 9.41% of
+   extra sample where the answer is 22.46% — **less than half**, in the direction that lets a test
+   ship. `population.design_table` now carries both columns so the size of the error stays visible, and
+   `experiment.effective_cluster_size` is the correction. Found by writing a concentration measure,
+   which forced the question "which m?" that four waves had not asked.
+2. **My first control was the world waves 1 to 4 published, which would have credited an artefact to
+   concentration.** Reassigning contacts among the customers an account actually saw raises the mean
+   cluster size from 1.96 to 2.43 with **no concentration at all**, because a customer who was seen once
+   can be seen twice while one who was never seen cannot enter. Comparing against the published world
+   would have attributed that entire jump to the log-normal rate. The control is now the same
+   regrouping at equal rates. Found by running the dispersion-zero case and not believing the customer
+   count.
+3. **I published an invariance one wave before finding its boundary.** Wave 4's headline is that
+   nothing already measured moves; wave 5's regrouping is invariant per contact as an exact identity,
+   and the combination of regrouping **and** correlated traits moves the resolution rate by 1.53
+   points. The two statements are both true and the second one is the interesting one, but the first
+   was published in a form that invited the wrong generalisation. The distinction is now Result 3
+   rather than a footnote.
+4. **A per-customer estimate compared across worlds with different customer counts.** Deflection per
+   customer rises from 1.5484 to 1.7845 in the concentrated world and my first note called that a 15%
+   rise in what the bot deflects. It is a denominator: the same volume divided among fewer people. The
+   comparable quantity is the relative error, which rises 66%. Caught by asking where the rise came
+   from before writing it down — the one habit that has caught more defects in this repository than any
+   test.
+
 ## What is deliberately not here
 
 - **No language model, and no API call to one.** The bot is a policy plus a declared response curve.
@@ -283,19 +349,21 @@ no correlation estimate is more expensive than the problem. Only the control wor
 
 ## Still open
 
-- **A frequent caller who is also a difficult one.** Wave 4 correlates a customer's difficulty and
-  patience and leaves their contact *frequency* independent of both, so the people who contact most
-  are not the people who are hardest to satisfy. In a real account they overlap, and the overlap is
-  what makes a frequent caller expensive. It would sharpen wave 4's Result 4 and leave Result 3 where
-  it is.
+- **More volume, not the same volume rearranged.** Wave 5 redistributes 31,802 contacts among fewer
+  people, so every figure in it is the pure regrouping effect. An account whose frequent callers are
+  difficult has *more* contacts than one whose are not, and that second effect is additive to
+  everything wave 5 measured.
+- **A rate that changes within the period.** A customer's propensity is constant here. Real escalation
+  looks like a month of silence, a failure, and then nine contacts in a fortnight - which is a hazard
+  model rather than a rate, and it would put the repeat chain and the concentration in the same
+  mechanism.
+- **A true heavy tail.** A log-normal rate has no outliers worth naming. The customer an operation
+  discusses by name - two hundred contacts in a month - is a different distribution, and it moves the
+  burden table further than it moves the design effect.
 - **Tail dependence rather than a shifted mean.** A Gaussian copula gives a customer who is difficult
   a uniformly higher chance of being difficult again. Real escalations look like a heavy tail: mostly
   ordinary, occasionally catastrophic. A copula with tail dependence is the honest shape and it is a
   different parameter, not a different number.
-- **Clusters larger than two.** Every design effect in wave 4 is bounded by a factor of two because
-  this account's customers average 1.96 contacts. The same arithmetic at clusters of fifty - a study
-  randomised by depot, clinic or school - is a different order of problem, and quoting wave 4's modest
-  figures as reassurance there would be a misreading of them.
 - **Calibrating the classifier score, so the closed-form threshold has the input it assumes.** Wave 3
   shows the formula's ranking surviving and its levels failing on a margin. Isotonic or Platt scaling on
   a held-out period is the missing step, and it is the difference between a threshold that is optimal and

@@ -44,6 +44,12 @@ sit inside the range an earlier wave had to guess at. Nothing here is evidence a
 real account's contacts are. It is evidence about what a correlation of a declared size does to a
 measurement, and about how much of it survives into an outcome.
 
+And from wave 5 **how often** a customer contacts is invented too, along with the link between
+contacting often and being difficult. The rate is log-normal with a declared dispersion, correlated
+with the customer's own difficulty at a declared 0.40, and the account exists in a control version
+where every customer contacts at the same rate. No real account's concentration is measured or claimed
+anywhere: what is shown is what a declared concentration does to a measurement.
+
 Everything in the generator was designed to make a particular measurement situation visible — one
 contact reason that is mostly answerable and mostly self-serving, one that is neither, a residue whose
 handling time rises with difficulty, a repeat stream that an unresolved conversation produces, and a
@@ -105,6 +111,12 @@ dificuldade e da paciência de cada cliente pertencendo à pessoa. Essa parcela 
 escolhida para cair dentro da faixa que uma onda anterior teve de supor. Nada aqui é evidência sobre
 quão correlacionados são os contatos de uma conta real. É evidência sobre o que uma correlação de
 tamanho declarado faz a uma medição, e sobre quanto dela sobrevive até um desfecho.
+
+E a partir da onda 5 **com que frequência** um cliente contata também é inventado, junto com o vínculo
+entre contatar muito e ser difícil. A taxa é log-normal com dispersão declarada, correlacionada com a
+dificuldade do próprio cliente a um declarado 0,40, e a conta existe numa versão de controle em que
+todo cliente contata na mesma taxa. A concentração de nenhuma conta real é medida ou afirmada em lugar
+algum: o que se mostra é o que uma concentração declarada faz a uma medição.
 
 Tudo no gerador foi desenhado para tornar visível uma situação de medição específica — uma razão de
 contato em boa parte respondível e em boa parte autorresolvível, uma que não é nem uma coisa nem outra,

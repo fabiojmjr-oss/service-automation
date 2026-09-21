@@ -26,7 +26,12 @@ import pandas as pd
 from scipy import stats
 
 from svclab.containment import containment_table
-from svclab.experiment import actual_alpha, design_effect, intracluster_correlation
+from svclab.experiment import (
+    actual_alpha,
+    design_effect,
+    effective_cluster_size,
+    intracluster_correlation,
+)
 from svclab.synth import CENTRE, POPULATION, CentreProfile, PopulationProfile
 from svclab.synth.customers import latent_traits
 
@@ -41,7 +46,9 @@ DESIGN_COLUMNS = (
     "world",
     "icc",
     "mean_cluster_size",
+    "effective_cluster_size",
     "design_effect",
+    "design_effect_at_mean",
     "sample_inflation",
     "nominal_alpha",
     "actual_alpha",
@@ -237,8 +244,13 @@ def design_table(
     for label, frame in outcomes.items():
         first = _first_sessions(frame)
         icc = intracluster_correlation(first, "customer", "resolved")
-        size = len(first) / float(first["customer"].nunique())
-        effect = design_effect(size, icc)
+        sizes = first.groupby("customer").size()
+        size = len(first) / float(sizes.size)
+        # The size-weighted mean, not the mean. Wave 4 published this table with the mean, which
+        # understates the inflation whenever the clusters are unequal - and they always are. The
+        # column that keeps the old number is there so the size of that mistake stays visible.
+        weighted = effective_cluster_size(sizes)
+        effect = design_effect(weighted, icc)
         # A measured design effect below one is a negative correlation estimate, which is not an
         # inflation, and wave 3's function refuses it rather than clipping it to five per cent. The
         # refusal is kept here: the independent world's row reports no actual alpha because there is
@@ -248,7 +260,9 @@ def design_table(
                 "world": label,
                 "icc": icc,
                 "mean_cluster_size": size,
+                "effective_cluster_size": weighted,
                 "design_effect": effect,
+                "design_effect_at_mean": design_effect(size, icc),
                 "sample_inflation": effect - 1.0,
                 "nominal_alpha": alpha,
                 "actual_alpha": actual_alpha(alpha, effect) if effect >= 1.0 else float("nan"),
@@ -337,7 +351,7 @@ def error_table(
             per_customer = arm.groupby("customer")["resolved"].mean().to_numpy(dtype=float)
             clustered += float(per_customer.var(ddof=1)) / per_customer.size
             pooled_icc.append(intracluster_correlation(arm, "customer", "resolved"))
-            pooled_size.append(values.size / float(per_customer.size))
+            pooled_size.append(effective_cluster_size(arm.groupby("customer").size()))
         naive_se = math.sqrt(naive)
         effect = design_effect(float(np.mean(pooled_size)), float(np.mean(pooled_icc)))
         corrected = naive_se * math.sqrt(effect)
