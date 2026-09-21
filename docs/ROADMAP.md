@@ -173,6 +173,13 @@ shortcut as a property of contact centres.
 5. **A test that assumed a threshold of 1.0 defers every contact.** The score is clipped into the unit
    interval, so contacts sitting exactly at the ceiling survive the cut. The test was wrong and the code
    was right; the test now uses 1.5 and records why.
+6. **A type error that only the matrix could see.** `best_by` took the winning threshold through
+   `Series.idxmax()` and `.loc`, which type-checks against the pandas stubs my interpreter resolved and
+   not against the newer ones the 3.12 job installed — `idxmax` returns a `Hashable`, and `.loc` has no
+   overload for one. The gate was green locally and red on the first push. It now selects positionally
+   through NumPy, which is version-independent and says what it means: take the first best row. **The
+   second time in this family of repositories that a figure or a check held on one machine and moved on
+   a clean install** — which is the reason the matrix exists and the reason the CI gate is not optional.
 
 ## What is deliberately not here
 

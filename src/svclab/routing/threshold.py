@@ -222,5 +222,6 @@ def best_by(curve: pd.DataFrame, column: str, largest: bool) -> float:
     """
     if column not in curve.columns:
         raise KeyError(f"{column!r} is not a column of this curve: {list(curve.columns)}")
-    position = curve[column].idxmax() if largest else curve[column].idxmin()
-    return float(curve["threshold"].loc[position])
+    values = curve[column].to_numpy(dtype=float)
+    position = int(values.argmax() if largest else values.argmin())
+    return float(curve["threshold"].to_numpy(dtype=float)[position])
