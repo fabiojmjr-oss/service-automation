@@ -71,6 +71,37 @@ source and fails on any draw that is not `rng.random`.
 one person's contacts across the arms would let the bot's effect leak into the control. It costs a
 wider interval and it is the only correct choice.
 
+## Result 3: the same account twice, from the same noise
+
+Waves 1 to 3 drew every trait per contact, which made a customer id a label on a row rather than
+somebody with a history. Wave 4 adds the second version of the account without touching the first.
+
+```python
+data = generate_dataset()
+other = correlated_dataset(data)  # each customer now has a difficulty and a patience of their own
+```
+
+Two design decisions carry it, and both were chosen so that the comparison between the worlds means
+something:
+
+**The customer's percentiles are drawn last, and spent elsewhere.** `customer_components` consumes the
+generator after every other table, so the independent world's draws are bit-for-bit what they were
+before this wave existed — and the claims tests for waves 1 to 3 are what proves it.
+
+**The uniforms behind every outcome are kept in the table.** `u_bot`, `u_self_serve`, `u_seconds`,
+`u_patience` and `u_human` are the coins that were flipped, and the second world reuses them rather
+than flipping new ones. Only the bias changes. Four of the five are truth by another route — a
+uniform plus the curve it was compared against is the answer — so the test that stops
+`svclab.bot.policy` reaching a truth column had to grow to cover them. A rule that does not grow with
+the table protects a shape the data no longer has.
+
+The construction itself is a **Gaussian copula**: the trait's percentile goes through the normal
+quantile, is mixed with the customer's at loadings `sqrt(rho)` and `sqrt(1 - rho)`, and comes back
+through the trait's own quantile function. The marginal distribution is therefore unchanged — same
+family, same mean, same variance, same support — and the only thing that moves is the dependence
+between two contacts of one person. What that buys, and what it does not, is
+[`svclab.population`](../population/README.md).
+
 ## Assumptions and limitations
 
 - **Nothing here is a measurement of any real operation.** The intent labels, the shares, the handling
@@ -90,6 +121,10 @@ wider interval and it is the only correct choice.
   capacity plan built on average load is the flattering version of the problem.
 - **A contact has one intent and one attempt at being classified.** No multi-intent conversations, no
   re-classification mid-session.
+- **A customer's effect reaches difficulty and patience, and stops there.** Contact frequency is still
+  drawn independently of both, so the people who contact most are not the people who are hardest to
+  satisfy. In a real account those two groups overlap, and the overlap is what makes a frequent caller
+  expensive.
 
 ## Sources
 
@@ -174,6 +209,36 @@ falha em qualquer sorteio que não seja `rng.random`.
 uma pessoa entre os braços deixaria o efeito do bot vazar para o controle. Custa um intervalo mais
 largo e é a única escolha correta.
 
+## Resultado 3: a mesma conta duas vezes, a partir do mesmo ruído
+
+As ondas 1 a 3 sorteavam todo traço por contato, o que fazia de um id de cliente um rótulo numa linha
+e não alguém com histórico. A onda 4 acrescenta a segunda versão da conta sem tocar na primeira.
+
+```python
+data = generate_dataset()
+other = correlated_dataset(data)  # cada cliente passa a ter dificuldade e paciência próprias
+```
+
+Duas decisões de projeto sustentam isso, e ambas foram escolhidas para que a comparação entre os
+mundos signifique algo:
+
+**Os percentis do cliente são sorteados por último e gastos em outro lugar.** `customer_components`
+consome o gerador depois de toda outra tabela, então os sorteios do mundo independente são bit a bit o
+que eram antes desta onda existir — e os testes de cifras das ondas 1 a 3 são o que prova isso.
+
+**Os uniformes por trás de cada desfecho ficam guardados na tabela.** `u_bot`, `u_self_serve`,
+`u_seconds`, `u_patience` e `u_human` são as moedas que foram lançadas, e o segundo mundo as
+reaproveita em vez de lançar outras. Só o viés muda. Quatro das cinco são verdade por outro caminho —
+um uniforme mais a curva contra a qual ele foi comparado é a resposta — então o teste que impede
+`svclab.bot.policy` de alcançar uma coluna de verdade teve de crescer para cobri-las. Uma regra que
+não cresce com a tabela protege uma forma que os dados já não têm.
+
+A construção em si é uma **cópula gaussiana**: o percentil do traço passa pelo quantil normal, é
+misturado ao do cliente com cargas `sqrt(rho)` e `sqrt(1 - rho)` e volta pela função quantil do
+próprio traço. A distribuição marginal fica portanto inalterada — mesma família, mesma média, mesma
+variância, mesmo suporte — e o único que se move é a dependência entre dois contatos de uma mesma
+pessoa. O que isso compra, e o que não compra, é [`svclab.population`](../population/README.md).
+
 ## Premissas e limitações
 
 - **Nada aqui é medição de operação real alguma.** Os rótulos de intenção, as frações, os tempos de
@@ -194,6 +259,10 @@ largo e é a única escolha correta.
   plano de capacidade construído sobre carga média é a versão lisonjeira do problema.
 - **Um contato tem uma intenção e uma tentativa de ser classificado.** Sem conversas multi-intenção,
   sem reclassificação no meio da sessão.
+- **O efeito de um cliente alcança dificuldade e paciência, e para aí.** A frequência de contato
+  continua sorteada de forma independente das duas, então quem mais contata não é quem é mais difícil
+  de satisfazer. Numa conta real esses dois grupos se sobrepõem, e é a sobreposição que torna um
+  chamador frequente caro.
 
 ## Fontes
 

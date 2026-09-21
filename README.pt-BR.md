@@ -141,6 +141,49 @@ precificadas:
   por contato. Isso é uma limitação do simulador, publicada como tal — as correlações dos cenários acima
   são declaradas, não medidas.
 
+## E o cliente, em tudo isso, era um rótulo
+
+Toda cifra acima foi medida num gerador que sorteia cada traço por contato. Um id de cliente é,
+portanto, um rótulo numa linha e não alguém com histórico — e é por isso que a onda 3, ao ir medir o
+agrupamento sobre o qual ela mesma havia alertado, encontrou correlação intraclasse de
+aproximadamente **zero** e teve de precificar correlações *declaradas*.
+
+Então a conta agora existe duas vezes. O mundo **independente** é o de cima. O mundo
+**correlacionado** dá a cada cliente uma dificuldade e uma paciência próprias, e é construído a partir
+do **ruído idêntico**: o percentil de um traço é misturado ao do seu cliente por uma cópula gaussiana,
+que deixa toda distribuição marginal exatamente onde estava e muda apenas a dependência entre dois
+contatos de uma mesma pessoa. O mundo independente é, assim, um **controle**, não uma linha de base.
+
+- **Nada do que foi publicado se move.** Contenção de sessão 0,6065 contra 0,6046, resolução 0,6355
+  contra 0,6357, e **duas horas humanas em 2.730**. O maior movimento relativo entre oito métricas
+  publicadas é **0,89%**. Isso é a pré-condição, não o resultado: é o que faz de tudo abaixo uma
+  afirmação sobre dependência e sobre mais nada. **Uma correlação não muda o que aconteceu — muda o
+  que se pode concluir disso.**
+- **Correlação entre pessoas não é correlação entre desfechos, e a diferença é um fator de 5,6.**
+  Declarada em **0,2500** entre clientes, a correlação mede 0,2535 na escala latente, 0,2463 na própria
+  dificuldade e **0,0448 na resolução em que um teste de fato roda**. Uma resolução é uma moeda cujo
+  viés é correlacionado, não uma moeda correlacionada, e a uma taxa de resolução perto de 0,64 a moeda
+  é a maior parte da variância. A regra que segue é curta: **estime a correlação do desfecho que você
+  está testando, nunca a do traço que você acredita que o dirige.**
+- **O que torna o alarme da própria onda 3 sete vezes alto demais nesta conta.** O efeito de desenho
+  medido é **1,0432** — 4,32% mais amostra, e um teste nominal de 5% rodando de fato a **5,50%** —
+  contra os 1,2891 e 8,43% que a onda 3 precificou a um declarado 0,30. No dimensionamento da onda 3,
+  de 405 contatos por braço, o poder é 0,8026 se os contatos forem independentes, **0,7859** no efeito
+  medido e 0,6970 no declarado: **1,7 ponto de poder, não 11.** O efeito é real, mensurável e modesto,
+  porque um efeito de desenho é produto de dois fatores e os grupos desta conta têm em média dois
+  contatos.
+- **E o KPI é cego para o que a operação sente.** Entre clientes com exatamente dois contatos, a
+  fração falhada nas **duas** vezes sobe de 0,1219 para **0,1406** — 98 pessoas a mais, no mesmo
+  volume, enquanto a taxa de resolução se move 0,0002. Uma taxa de resolução é ponderada por contato;
+  uma reclamação, um churn e um ofício de regulador são ponderados por cliente. As duas coincidem
+  exatamente quando um cliente é um rótulo.
+- **E a correção que a maioria usa custa dezenove vezes o erro que corrige.** Tirar a média da média
+  de cada cliente infla o erro padrão em **13,3% no mundo independente** — onde não há correlação
+  alguma a corrigir — porque pesar igualmente grupos de tamanhos diferentes descarta informação. A
+  contribuição da própria correlação para o mesmo erro padrão é de **0,7%**. A linha do mundo
+  independente é a única razão pela qual isso fica visível, e é o argumento a favor de manter um mundo
+  de controle em vez de uma história melhor.
+
 ## Módulos
 
 | Módulo | O que decide |
@@ -152,6 +195,7 @@ precificadas:
 | [`svclab.quality`](src/svclab/quality/README.md) | Se a nota de qualidade é uma medição ou um hábito, quanto de uma diferença real este painel vai reportar, e o que um instrumento não qualificado custa em sessões. |
 | [`svclab.routing`](src/svclab/routing/README.md) | Onde cortar o score do classificador quando os dois erros custam números diferentes de segundos humanos, o que a forma fechada desse corte assume sobre o score, e por qual objetivo o corte está sendo ajustado. |
 | [`svclab.experiment`](src/svclab/experiment/README.md) | Quantos contatos um teste de duas políticas precisa quando clientes repetem, e a qual nível de significância um teste que ignora o agrupamento roda de fato. |
+| [`svclab.population`](src/svclab/population/README.md) | Quanto valia a premissa de independência: quanto de uma correlação entre clientes sobrevive até o desfecho em que um teste roda, o que a parte sobrevivente custa, e o que custa a correção usual para ela. |
 
 Todo README de módulo é bilíngue e traz uma seção **Premissas e limitações**, porque uma cifra sem suas
 premissas não é um resultado.
@@ -163,6 +207,7 @@ premissas não é um resultado.
 | [`examples/01_the_containment_that_wasnt.py`](examples/01_the_containment_that_wasnt.py) | Quatro políticas numa conta: as quatro taxas de contenção e o ranking que cada uma produz, quais contatos o bot ficou, o que a fila recebeu contra o que foi afirmado, e o business case de headcount decomposto nos seus três erros. |
 | [`examples/02_the_meter_that_was_noise.py`](examples/02_the_meter_that_was_noise.py) | O estudo do instrumento rodado antes da comparação: repetibilidade, reprodutibilidade, viés contra um padrão declarado, o fator exato pelo qual o painel encolhe toda diferença, o que isso custa em sessões, e contra o que um juiz automático seria validado. |
 | [`examples/03_three_numbers_nobody_priced.py`](examples/03_three_numbers_nobody_priced.py) | Os três padrões precificados: o limiar de roteamento varrido contra os dois objetivos e contra sua forma fechada, a fila com impaciência e com a realimentação de repetições resolvida até o ponto fixo, e o que custa um teste real de duas políticas quando clientes podem repetir. |
+| [`examples/04_the_customer_who_was_a_label.py`](examples/04_the_customer_who_was_a_label.py) | A mesma conta construída duas vezes a partir do mesmo ruído: se a correlação move algo já publicado, quanto dela chega ao desfecho, o que custa a uma comparação, quantas pessoas são falhadas duas vezes, e o que três erros padrão diferentes dizem sobre uma mesma diferença. |
 
 ## Instalar e rodar
 
@@ -173,12 +218,13 @@ make check-all   # o acima mais toda cifra documentada re-derivada
 python examples/01_the_containment_that_wasnt.py
 python examples/02_the_meter_that_was_noise.py
 python examples/03_three_numbers_nobody_priced.py
+python examples/04_the_customer_who_was_a_label.py
 ```
 
 ## Como as afirmações são mantidas honestas
 
-**216 testes, 100% de cobertura de linhas e de ramos.** 183 deles rodam em segundos e liberam cada push.
-Os 33 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
+**248 testes, 100% de cobertura de linhas e de ramos.** 208 deles rodam em segundos e liberam cada push.
+Os 40 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
 rodam o script de exemplo. Uma mudança que mova um número publicado quebra o build em vez de deixar o
 texto silenciosamente errado.
 
@@ -203,7 +249,7 @@ modo que a posição no stream depende de quantos valores são pedidos e não de
 responde. Essa regra é verificada contra o código-fonte, porque um repositório irmão publicou cifras
 que valiam numa máquina e mudavam numa instalação limpa.
 
-**E defeitos são registrados em vez de corrigidos em silêncio.** Quinze até aqui, em
+**E defeitos são registrados em vez de corrigidos em silêncio.** Vinte e um até aqui, em
 [`docs/ROADMAP.md`](docs/ROADMAP.md), cada um deles achado conectando os módulos, por um caso de
 controle ou verificando uma frase — nenhum lendo código. Dois valem a leitura. A sessão original cobrava
 um recontato como segundos extras em vez de como uma linha, o que torna o desvio aritmeticamente

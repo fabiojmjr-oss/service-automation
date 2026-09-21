@@ -29,34 +29,77 @@ def uniform(rng: np.random.Generator, size: int | tuple[int, ...]) -> np.ndarray
     return rng.random(size)
 
 
+def normal_from(percentile: np.ndarray, sd: float = 1.0) -> np.ndarray:
+    """The normal quantile of uniforms already drawn, separable for the reason below."""
+    return np.asarray(stats.norm.ppf(percentile) * sd, dtype=float)
+
+
 def normal(rng: np.random.Generator, size: int | tuple[int, ...], sd: float = 1.0) -> np.ndarray:
     """Normal draws by inverse transform, in place of ``Generator.normal``.
 
     ``Generator.standard_normal`` is the ziggurat algorithm, which rejects, so it belongs to the
     same class of hazard as the binomial this rule was written for.
     """
-    return np.asarray(stats.norm.ppf(uniform(rng, size)) * sd, dtype=float)
+    return normal_from(uniform(rng, size), sd)
+
+
+def to_latent(percentile: np.ndarray) -> np.ndarray:
+    """A percentile as a standard normal value.
+
+    Used with :func:`from_latent` to add a customer-level effect to a trait without touching the
+    trait's marginal distribution. Both directions are quantile functions of the uniform stream, so
+    the rule this module exists for is not broken by going through them.
+    """
+    return np.asarray(stats.norm.ppf(percentile), dtype=float)
+
+
+def from_latent(latent: np.ndarray) -> np.ndarray:
+    """A standard normal value back as a percentile, the inverse of :func:`to_latent`."""
+    return np.asarray(stats.norm.cdf(latent), dtype=float)
+
+
+def beta_percentile(value: np.ndarray, alpha: float, beta_shape: float) -> np.ndarray:
+    """Which percentile of ``Beta(alpha, beta_shape)`` a value sits at.
+
+    The one place this package inverts a draw rather than making one: a contact's difficulty was
+    drawn as a percentile, and recovering it is what lets a second population reuse the identical
+    noise instead of drawing its own.
+    """
+    return np.asarray(stats.beta.cdf(value, alpha, beta_shape), dtype=float)
+
+
+def beta_quantile(percentile: np.ndarray, alpha: float, beta_shape: float) -> np.ndarray:
+    """The ``Beta(alpha, beta_shape)`` quantile of percentiles already in hand."""
+    return np.asarray(stats.beta.ppf(percentile, alpha, beta_shape), dtype=float)
 
 
 def beta(rng: np.random.Generator, size: int, alpha: float, beta_shape: float) -> np.ndarray:
     """Beta draws by inverse transform, in place of ``Generator.beta``."""
-    return np.asarray(stats.beta.ppf(uniform(rng, size), alpha, beta_shape), dtype=float)
+    return beta_quantile(uniform(rng, size), alpha, beta_shape)
 
 
-def exponential(rng: np.random.Generator, size: int, mean: float) -> np.ndarray:
-    """Exponential draws by inverse transform, in place of ``Generator.exponential``.
+def exponential_from(percentile: np.ndarray, mean: float) -> np.ndarray:
+    """The exponential quantile of uniforms already drawn.
 
     Used for handling times and for customer patience, where the memoryless property is the
     assumption the queueing formulas in :mod:`svclab.capacity` are built on - stated here because it
     is an assumption about people, and the one this whole family of models is most often wrong
     about.
+
+    Takes a percentile rather than a generator so that a draw can be **kept** and replayed against a
+    different world. Wave 4 builds a second population from the identical noise, which is only
+    possible where the transform is separable from the drawing.
     """
-    return np.asarray(-mean * np.log1p(-uniform(rng, size)), dtype=float)
+    return np.asarray(-mean * np.log1p(-percentile), dtype=float)
 
 
-def bernoulli(rng: np.random.Generator, probability: np.ndarray) -> np.ndarray:
-    """One Bernoulli trial per element of ``probability``."""
-    return uniform(rng, probability.size) < probability
+def bernoulli_from(percentile: np.ndarray, probability: np.ndarray) -> np.ndarray:
+    """One Bernoulli trial per element, from uniforms already drawn.
+
+    Separable for the same reason as :func:`exponential_from`: the outcome of a coin whose bias
+    changes is only comparable if the coin itself did not.
+    """
+    return np.asarray(percentile < probability, dtype=bool)
 
 
 def categorical(rng: np.random.Generator, size: int, weights: np.ndarray) -> np.ndarray:

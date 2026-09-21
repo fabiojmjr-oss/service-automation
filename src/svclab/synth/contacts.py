@@ -21,7 +21,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from ._draws import bernoulli, beta, categorical, exponential, uniform
+from ._draws import bernoulli_from, beta, categorical, exponential_from, uniform
 from .config import CENTRE, INTENTS, CentreProfile
 
 #: Columns of the contact table, in order.
@@ -39,7 +39,16 @@ CONTACT_COLUMNS = (
     "patience_turns",
     "repeats_if_unresolved",
     "human_resolves",
+    "u_bot",
+    "u_self_serve",
+    "u_seconds",
+    "u_patience",
+    "u_human",
 )
+
+#: The retained uniforms, and the four of them that are truth by another name.
+DRAW_COLUMNS = ("u_bot", "u_self_serve", "u_seconds", "u_patience", "u_human")
+TRUTH_DRAW_COLUMNS = ("u_bot", "u_self_serve", "u_seconds", "u_human")
 
 #: Columns of the per-intent truth table.
 INTENT_TRUTH_COLUMNS = (
@@ -90,33 +99,22 @@ def contacts(rng: np.random.Generator, centre: CentreProfile = CENTRE) -> pd.Dat
     # the same arm. One uniform per customer, not per contact.
     holdout_by_customer = uniform(rng, centre.customers) < centre.holdout_share
 
-    ceilings = np.array([profile.bot_ceiling for profile in INTENTS])[which]
-    slopes = np.array([profile.bot_difficulty_slope for profile in INTENTS])[which]
-    bot_can_resolve = bernoulli(rng, _rate(ceilings, slopes, difficulty))
-
-    ceilings = np.array([profile.self_serve_ceiling for profile in INTENTS])[which]
-    slopes = np.array([profile.self_serve_difficulty_slope for profile in INTENTS])[which]
-    would_self_serve = bernoulli(rng, _rate(ceilings, slopes, difficulty))
-
-    base = np.array([profile.human_seconds_base for profile in INTENTS])[which]
-    slope = np.array([profile.human_seconds_slope for profile in INTENTS])[which]
-    mean_seconds = base + slope * difficulty
-    # Exponential around that mean, which is the service-time assumption the queueing formulas in
-    # svclab.capacity are built on. Drawn here so that the panel and the formulas agree by
-    # construction rather than by hope.
-    human_seconds = exponential(rng, count, 1.0) * mean_seconds
-
+    # Every uniform below is kept in the returned table. The draws are unchanged and in the same
+    # order - each `bernoulli` and `exponential` call was already this uniform followed by this
+    # transform - but keeping them separates the **noise** of a contact from the **structure** that
+    # turns it into an outcome. Wave 4 replays the identical noise against a population where a
+    # customer is a person rather than a label, and it can only isolate that structure because
+    # nothing was redrawn.
+    u_bot = uniform(rng, count)
+    u_self_serve = uniform(rng, count)
+    u_seconds = uniform(rng, count)
     classifier_draw = uniform(rng, count)
-    patience_turns = np.ceil(exponential(rng, count, centre.patience_turns_mean))
-
+    u_patience = uniform(rng, count)
     repeat = np.array([profile.repeat_when_unresolved for profile in INTENTS])[which]
-    repeats_if_unresolved = bernoulli(rng, repeat)
-
+    repeats_if_unresolved = bernoulli_from(uniform(rng, count), repeat)
     # Appended last, and it must stay last: a human does not resolve everything, and a model in
     # which they do quietly awards the control arm a perfect score.
-    ceilings = np.array([profile.human_ceiling for profile in INTENTS])[which]
-    slopes = np.array([profile.human_difficulty_slope for profile in INTENTS])[which]
-    human_resolves = bernoulli(rng, _rate(ceilings, slopes, difficulty))
+    u_human = uniform(rng, count)
 
     frame = pd.DataFrame(
         {
@@ -126,16 +124,87 @@ def contacts(rng: np.random.Generator, centre: CentreProfile = CENTRE) -> pd.Dat
             "arrival_hour": arrival_hour,
             "holdout": holdout_by_customer[customer],
             "difficulty": difficulty,
-            "bot_can_resolve": bot_can_resolve,
-            "would_self_serve": would_self_serve,
-            "human_seconds": human_seconds,
             "classifier_draw": classifier_draw,
-            "patience_turns": patience_turns,
             "repeats_if_unresolved": repeats_if_unresolved,
-            "human_resolves": human_resolves,
+            "u_bot": u_bot,
+            "u_self_serve": u_self_serve,
+            "u_seconds": u_seconds,
+            "u_patience": u_patience,
+            "u_human": u_human,
         }
     )
-    return frame[list(CONTACT_COLUMNS)]
+    return outcomes_from_difficulty(frame, which, centre)
+
+
+def intent_index(table: pd.DataFrame) -> np.ndarray:
+    """Each contact's intent as an index into :data:`svclab.synth.INTENTS`.
+
+    The contact table carries the label rather than the index, and every per-intent curve is keyed
+    on the index. Recovered rather than stored, so there is one representation of the intent in the
+    table and no way for the two to disagree.
+    """
+    order = {profile.intent: position for position, profile in enumerate(INTENTS)}
+    return table["intent"].map(order).to_numpy(dtype=int)
+
+
+def outcomes_from_difficulty(
+    frame: pd.DataFrame, which: np.ndarray, centre: CentreProfile = CENTRE
+) -> pd.DataFrame:
+    """The truth columns that follow from a difficulty, given the noise already drawn.
+
+    Separated from :func:`contacts` so that exactly one thing can change - the difficulty and the
+    patience of a contact - while every uniform behind the outcome stays where it was. That is what
+    makes :mod:`svclab.population`'s second world a comparison rather than another simulation.
+
+    Args:
+        frame: A contact table carrying at least ``difficulty``, ``u_patience`` and the uniforms in
+            :data:`TRUTH_DRAW_COLUMNS`.
+        which: Index of each contact's intent into :data:`svclab.synth.INTENTS`.
+        centre: The centre's declared shape.
+
+    Returns:
+        A new frame with the columns in :data:`CONTACT_COLUMNS`, the outcome columns recomputed.
+    """
+    difficulty = frame["difficulty"].to_numpy(dtype=float)
+
+    ceilings = np.array([profile.bot_ceiling for profile in INTENTS])[which]
+    slopes = np.array([profile.bot_difficulty_slope for profile in INTENTS])[which]
+    bot_can_resolve = bernoulli_from(
+        frame["u_bot"].to_numpy(dtype=float), _rate(ceilings, slopes, difficulty)
+    )
+
+    ceilings = np.array([profile.self_serve_ceiling for profile in INTENTS])[which]
+    slopes = np.array([profile.self_serve_difficulty_slope for profile in INTENTS])[which]
+    would_self_serve = bernoulli_from(
+        frame["u_self_serve"].to_numpy(dtype=float), _rate(ceilings, slopes, difficulty)
+    )
+
+    base = np.array([profile.human_seconds_base for profile in INTENTS])[which]
+    slope = np.array([profile.human_seconds_slope for profile in INTENTS])[which]
+    mean_seconds = base + slope * difficulty
+    # Exponential around that mean, which is the service-time assumption the queueing formulas in
+    # svclab.capacity are built on. Drawn here so that the panel and the formulas agree by
+    # construction rather than by hope.
+    human_seconds = exponential_from(frame["u_seconds"].to_numpy(dtype=float), 1.0) * mean_seconds
+
+    patience_turns = np.ceil(
+        exponential_from(frame["u_patience"].to_numpy(dtype=float), centre.patience_turns_mean)
+    )
+
+    ceilings = np.array([profile.human_ceiling for profile in INTENTS])[which]
+    slopes = np.array([profile.human_difficulty_slope for profile in INTENTS])[which]
+    human_resolves = bernoulli_from(
+        frame["u_human"].to_numpy(dtype=float), _rate(ceilings, slopes, difficulty)
+    )
+
+    built = frame.assign(
+        bot_can_resolve=bot_can_resolve,
+        would_self_serve=would_self_serve,
+        human_seconds=human_seconds,
+        patience_turns=patience_turns,
+        human_resolves=human_resolves,
+    )
+    return built[list(CONTACT_COLUMNS)]
 
 
 def intent_truth(table: pd.DataFrame) -> pd.DataFrame:

@@ -20,6 +20,7 @@ from svclab.synth import (
     GRADERS,
     INTENTS,
     QUALITY,
+    TRUTH_DRAW_COLUMNS,
     Dataset,
     contacts,
     generate_dataset,
@@ -202,7 +203,16 @@ class TestTheDisciplinesThatHoldTheRepositoryUp:
         the first version of this test grepped and failed on the docstring explaining the rule - the
         prose is allowed to name a column, the code is not.
         """
-        forbidden = {"difficulty", "would_self_serve", "human_seconds", "bot_can_resolve"}
+        forbidden = {
+            "difficulty",
+            "would_self_serve",
+            "human_seconds",
+            "bot_can_resolve",
+            # Wave 4 keeps the uniforms behind those columns in the table, and a uniform plus the
+            # curve it was compared against is the answer by another route. The rule has to grow
+            # with the table or it protects a shape the data no longer has.
+            *TRUTH_DRAW_COLUMNS,
+        }
         tree = ast.parse((SOURCE / "bot" / "policy.py").read_text(encoding="utf-8"))
         docstrings = {
             ast.get_docstring(node)

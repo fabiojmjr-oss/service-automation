@@ -29,6 +29,14 @@ from svclab.capacity import (
 )
 from svclab.containment import containment_table, deflection, selection_profile
 from svclab.experiment import intracluster_correlation, sizing_table
+from svclab.population import (
+    correlation_table,
+    design_table,
+    error_table,
+    pair_failures,
+    power_at,
+    world_table,
+)
 from svclab.quality import (
     agreement_table,
     attenuation,
@@ -41,7 +49,7 @@ from svclab.quality import (
     youden,
 )
 from svclab.routing import best_by, calibrated_threshold, cost_curve, cost_of, defer_below
-from svclab.synth import CENTRE, QUALITY, ROUTING, Dataset
+from svclab.synth import CENTRE, POPULATION, QUALITY, ROUTING, Dataset
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -355,6 +363,136 @@ def promised_agents_gap() -> float:
     from svclab.capacity import promised_agents
 
     return promised_agents(14, 0.6065)
+
+
+# --- svclab.population --------------------------------------------------------------------------
+
+
+def _worlds(
+    full: Dataset, correlated: Dataset
+) -> tuple[dict[str, pd.DataFrame], dict[str, pd.DataFrame], dict[str, pd.DataFrame]]:
+    """The two worlds, and the two arms of each, as the module's README computes them."""
+    contacts = {"independent": full.contacts, "correlated": correlated.contacts}
+    treated = {name: run(t[~t["holdout"]], THREE_TURNS) for name, t in contacts.items()}
+    control = {name: run(t[t["holdout"]], HUMAN_ONLY) for name, t in contacts.items()}
+    return contacts, treated, control
+
+
+def test_the_two_worlds_agree_on_every_figure_by_what_is_published(
+    full: Dataset, correlated: Dataset
+) -> None:
+    published = {
+        "mean difficulty": (0.3340, 0.3347),
+        "difficulty sd": (0.1776, 0.1782),
+        "mean patience turns": (4.5178, 4.5117),
+        "session containment": (0.6065, 0.6046),
+        "needed containment": (0.2145, 0.2126),
+        "resolution rate": (0.6355, 0.6357),
+        "repeats per contact": (0.2099, 0.2094),
+        "human hours": (2730.43, 2728.43),
+    }
+    contacts, treated, _control = _worlds(full, correlated)
+    table = world_table(contacts, treated)
+    indexed = table.set_index("metric")
+    for metric, (first, second) in published.items():
+        tolerance = 5e-3 if metric == "human hours" else 5e-5
+        assert float(indexed.loc[metric, "independent"]) == pytest.approx(first, abs=tolerance), (
+            metric
+        )
+        assert float(indexed.loc[metric, "correlated"]) == pytest.approx(second, abs=tolerance), (
+            metric
+        )
+    assert float(indexed.loc["human hours", "difference"]) == pytest.approx(-2.00, abs=5e-3)
+    relative = (table["difference"] / table["independent"]).abs()
+    assert float(relative.max()) == pytest.approx(0.0089, abs=5e-5)
+    assert table.loc[relative.idxmax(), "metric"] == "needed containment"
+
+
+def test_the_attenuation_chain_is_what_is_published(full: Dataset, correlated: Dataset) -> None:
+    contacts, treated, _control = _worlds(full, correlated)
+    table = correlation_table(contacts, treated).set_index("stage")
+    assert float(table.loc["declared", "difficulty"]) == POPULATION.difficulty_correlation
+    assert float(table.loc["declared", "patience"]) == POPULATION.patience_correlation
+    assert float(table.loc["latent", "difficulty"]) == pytest.approx(0.2535, abs=5e-5)
+    assert float(table.loc["latent", "patience"]) == pytest.approx(0.0911, abs=5e-5)
+    assert float(table.loc["observed", "difficulty"]) == pytest.approx(0.2463, abs=5e-5)
+    assert float(table.loc["observed", "patience"]) == pytest.approx(0.0740, abs=5e-5)
+    outcome = float(table.loc["outcome", "resolution"])
+    assert outcome == pytest.approx(0.0448, abs=5e-5)
+    assert POPULATION.difficulty_correlation / outcome == pytest.approx(5.6, abs=0.05)
+
+
+def test_the_design_effect_of_the_correlated_world_is_what_is_published(
+    full: Dataset, correlated: Dataset
+) -> None:
+    _contacts, treated, _control = _worlds(full, correlated)
+    table = design_table(treated).set_index("world")
+    assert float(table.loc["independent", "icc"]) == pytest.approx(-0.0126, abs=5e-5)
+    assert float(table.loc["independent", "design_effect"]) == pytest.approx(0.9879, abs=5e-5)
+    assert math.isnan(float(table.loc["independent", "actual_alpha"]))
+    assert float(table.loc["correlated", "icc"]) == pytest.approx(0.0448, abs=5e-5)
+    assert float(table.loc["correlated", "mean_cluster_size"]) == pytest.approx(1.9637, abs=5e-5)
+    assert float(table.loc["correlated", "design_effect"]) == pytest.approx(1.0432, abs=5e-5)
+    assert float(table.loc["correlated", "sample_inflation"]) == pytest.approx(0.0432, abs=5e-5)
+    assert float(table.loc["correlated", "actual_alpha"]) == pytest.approx(0.0550, abs=5e-5)
+
+
+def test_the_power_at_wave_threes_sizing_is_what_is_published(
+    full: Dataset, correlated: Dataset
+) -> None:
+    _contacts, treated, _control = _worlds(full, correlated)
+    measured = float(design_table(treated).set_index("world").loc["correlated", "design_effect"])
+    assert power_at(1.0, 0.0916, 0.6355, 405) == pytest.approx(0.8026, abs=5e-5)
+    assert power_at(measured, 0.0916, 0.6355, 405) == pytest.approx(0.7859, abs=5e-5)
+    assert power_at(1.2891, 0.0916, 0.6355, 405) == pytest.approx(0.6970, abs=5e-5)
+
+
+def test_the_customer_failed_twice_by_what_is_published(full: Dataset, correlated: Dataset) -> None:
+    _contacts, treated, _control = _worlds(full, correlated)
+    table = pair_failures(treated).set_index("world")
+    assert int(table.loc["independent", "pairs"]) == 5234
+    assert int(table.loc["correlated", "pairs"]) == 5234
+    assert float(table.loc["independent", "failure_rate"]) == pytest.approx(0.3632, abs=5e-5)
+    assert float(table.loc["correlated", "failure_rate"]) == pytest.approx(0.3629, abs=5e-5)
+    first = float(table.loc["independent", "both_failed"])
+    second = float(table.loc["correlated", "both_failed"])
+    assert first == pytest.approx(0.1219, abs=5e-5)
+    assert second == pytest.approx(0.1406, abs=5e-5)
+    assert float(table.loc["independent", "expected_if_independent"]) == pytest.approx(
+        0.1319, abs=5e-5
+    )
+    assert float(table.loc["correlated", "expected_if_independent"]) == pytest.approx(
+        0.1317, abs=5e-5
+    )
+    assert float(table.loc["independent", "ratio"]) == pytest.approx(0.9240, abs=5e-5)
+    assert float(table.loc["correlated", "ratio"]) == pytest.approx(1.0677, abs=5e-5)
+    assert second / first - 1.0 == pytest.approx(0.154, abs=5e-4)
+    assert (second - first) * 5234 == pytest.approx(98.0, abs=0.5)
+    ratios = float(table.loc["correlated", "ratio"]) / float(table.loc["independent", "ratio"])
+    assert ratios - 1.0 == pytest.approx(0.155, abs=5e-4)
+
+
+def test_the_three_standard_errors_are_what_is_published(
+    full: Dataset, correlated: Dataset
+) -> None:
+    _contacts, treated, control = _worlds(full, correlated)
+    table = error_table(treated, control).set_index("world")
+    assert float(table.loc["independent", "estimate"]) == pytest.approx(-0.2955, abs=5e-5)
+    assert float(table.loc["correlated", "estimate"]) == pytest.approx(-0.2956, abs=5e-5)
+    published = {
+        "independent": (0.003889, 0.004406, 0.003867, 1.1330, 0.9943),
+        "correlated": (0.003886, 0.004427, 0.003913, 1.1392, 1.0071),
+    }
+    for world, (naive, cluster, corrected, cluster_ratio, corrected_ratio) in published.items():
+        row = table.loc[world]
+        assert float(row["naive_se"]) == pytest.approx(naive, abs=5e-7), world
+        assert float(row["cluster_mean_se"]) == pytest.approx(cluster, abs=5e-7), world
+        assert float(row["corrected_se"]) == pytest.approx(corrected, abs=5e-7), world
+        assert float(row["cluster_mean_ratio"]) == pytest.approx(cluster_ratio, abs=5e-5), world
+        assert float(row["corrected_ratio"]) == pytest.approx(corrected_ratio, abs=5e-5), world
+    loss = float(table.loc["independent", "cluster_mean_ratio"]) - 1.0
+    gain = float(table.loc["correlated", "corrected_ratio"]) - 1.0
+    assert loss / gain == pytest.approx(19.0, abs=0.5)
 
 
 # --- The example -------------------------------------------------------------------------------

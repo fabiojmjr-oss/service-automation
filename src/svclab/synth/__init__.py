@@ -15,17 +15,26 @@ from .config import (
     GRADERS,
     INTENTS,
     JUDGE,
+    POPULATION,
     QUALITY,
     ROUTING,
     SEED,
     CentreProfile,
     GraderProfile,
     IntentProfile,
+    PopulationProfile,
     QualityProfile,
     RoutingProfile,
 )
-from .contacts import CONTACT_COLUMNS, INTENT_TRUTH_COLUMNS, contacts, intent_truth
-from .dataset import Dataset, generate_dataset
+from .contacts import (
+    CONTACT_COLUMNS,
+    INTENT_TRUTH_COLUMNS,
+    TRUTH_DRAW_COLUMNS,
+    contacts,
+    intent_truth,
+)
+from .customers import CUSTOMER_COLUMNS, blend, correlated_contacts, customer_components
+from .dataset import Dataset, correlated_dataset, generate_dataset
 from .quality import JUDGE_NOISE_COLUMNS, PANEL_NOISE_COLUMNS, quality_noise
 from .routing import ROUTING_SCORE_COLUMNS, accuracy_curve, routing_scores
 
@@ -35,21 +44,29 @@ __all__ = [
     "GRADERS",
     "INTENTS",
     "INTENT_TRUTH_COLUMNS",
+    "CUSTOMER_COLUMNS",
     "JUDGE",
     "JUDGE_NOISE_COLUMNS",
+    "POPULATION",
     "PANEL_NOISE_COLUMNS",
     "QUALITY",
     "ROUTING",
     "ROUTING_SCORE_COLUMNS",
     "SEED",
+    "TRUTH_DRAW_COLUMNS",
     "CentreProfile",
     "Dataset",
     "GraderProfile",
     "IntentProfile",
+    "PopulationProfile",
     "QualityProfile",
     "RoutingProfile",
     "accuracy_curve",
+    "blend",
     "contacts",
+    "correlated_contacts",
+    "correlated_dataset",
+    "customer_components",
     "generate_dataset",
     "intent_truth",
     "quality_noise",

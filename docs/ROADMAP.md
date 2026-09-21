@@ -181,6 +181,86 @@ shortcut as a property of contact centres.
    second time in this family of repositories that a figure or a check held on one machine and moved on
    a clean install** — which is the reason the matrix exists and the reason the CI gate is not optional.
 
+## Wave 4 — the customer who was a label *(complete)*
+
+Wave 3 warned about clustering, went to measure it, and found nothing to measure: the generator drew
+every trait per contact, so a customer was a label on a row. This wave builds the account a second
+time with customers who are people, from the identical noise, and prices what the independence
+assumption was worth.
+
+| Delivered | Where |
+| --- | --- |
+| The uniforms behind every outcome kept in the contact table, so a second world can replay them | `synth.contacts`, `synth.outcomes_from_difficulty` |
+| A per-customer percentile of difficulty and of patience, drawn last so no earlier figure moves | `synth.customer_components` |
+| The Gaussian copula that adds the correlation and leaves every marginal distribution untouched | `synth.blend`, `synth.correlated_contacts` |
+| The second dataset, assembled without redrawing anything | `synth.correlated_dataset` |
+| Whether the correlation moved anything already published | `population.world_table` |
+| The attenuation chain: declared, latent, observed on the trait, and on the outcome a test runs on | `population.correlation_table` |
+| The measured design effect and the error rate a per-contact test really runs at | `population.design_table` |
+| The power a sizing actually had, as the other side of wave 3's error rate | `population.power_at` |
+| How often the same person was failed twice, against the independent world as a control | `population.pair_failures` |
+| Three standard errors on one difference: naive, cluster-mean, and design-effect corrected | `population.error_table` |
+
+**The thread from wave 3.** Wave 3's last open item was its own limitation: it priced design effects
+at correlations it had to declare, because the world it measured had none. Wave 4 gives the world a
+correlation and measures the whole chain — and the chain is the finding. A quarter of a contact's
+difficulty belonging to the customer arrives as **4.5%** of the resolution a test is run on, which is
+a design effect of 1.0432 rather than the 1.2891 wave 3 treated as its serious case. The alarm was
+right in shape and seven times too loud in size.
+
+The result I did not expect is Result 1 of [`svclab.population`](../src/svclab/population/README.md),
+and it is the one that took the longest to earn. **Nothing already published moves** — eight metrics,
+largest relative movement 0.89%, two human hours out of 2,730 — and every claims test from waves 1 to
+3 passes unchanged against the new generator. That is not a null result. It is the precondition that
+makes the rest of the wave a statement about dependence rather than about two things at once, and the
+first version of the module did not have it.
+
+The second thing I did not expect is Result 5. I built the standard-error table to show what the
+correlation costs an interval, and the independent world's row says that **averaging each customer's
+average inflates the standard error by 13.3% on data with no correlation in it at all** — nineteen
+times the 0.7% the correlation itself is worth. The correction an analyst reaches for because it needs
+no correlation estimate is more expensive than the problem. Only the control world makes that legible.
+
+### Defects found and recorded
+
+1. **The first construction changed two things at once.** The customer effect began as a convex
+   combination of two draws — tidy, closed-form, and it multiplies the trait's variance by
+   ``w**2 + (1 - w)**2``. At the declared weight that is 0.545, so the correlated world had a
+   difficulty spread 26% narrower than the independent one, and the resolution rate moved from
+   **0.6355 to 0.7166** for a reason that had nothing to do with customers. Replaced by a Gaussian
+   copula, which holds the marginal distribution exactly and changes only the dependence. Found by
+   building the table whose only job was to check that nothing moved — a table I nearly did not write,
+   because the construction "obviously" preserved the mean.
+2. **I measured the correlation of the trait and nearly published it as the design effect.** The first
+   numbers out of this wave were the intracluster correlations of `difficulty` and `patience_turns`,
+   0.2463 and 0.0740, and the design effect that follows from them is about 1.22. The quantity a test
+   is sized on is the **outcome**, whose correlation is 0.0448 and whose design effect is 1.0432. Both
+   numbers are in the module now, as the two ends of the attenuation chain, which is a better result
+   than the one I was about to assert — but the mistake is exactly the one the module warns readers
+   about, made first by its author.
+3. **A refusal working correctly looked like a bug.** `design_table` crashed on the independent world:
+   the measured design effect is 0.9879, and wave 3's `actual_alpha` refuses an effect below one
+   rather than clipping a negative correlation estimate to nothing. My first instinct was that the
+   guard was in the way. It was right, and the table now reports no error rate for that row, which is
+   more honest than the 0.05 it would otherwise have printed.
+4. **The truth-blindness test would have passed while protecting nothing.** Keeping the uniforms in the
+   contact table added four columns that are truth by another route: a uniform plus the curve it was
+   compared against **is** the answer. The AST test that stops `svclab.bot.policy` reaching a truth
+   column knew only the old names, so it would have gone green while a policy read `u_self_serve`.
+   Found by asking what the new columns mean rather than by a failure. A rule that does not grow with
+   the table protects a shape the data no longer has.
+5. **A published figure mis-rounded in transcription.** The pair-failure ratio is 1.067660 and the
+   README quoted **1.0678**. Caught by the claims test the same hour it was written, for the fifth time
+   in this family of repositories. The lesson has stopped being about care: transcription by hand is
+   the defect, and the test is the control that makes it survivable.
+6. **Two draw functions went dead the moment the transforms were separated, and only coverage said
+   so.** Splitting `exponential` and `bernoulli` into a drawing half and a transforming half left the
+   drawing halves with no callers at all - the contact table now draws its own uniforms and applies the
+   transform itself. Coverage fell to 99% and named the two lines. Deleted, with the memorylessness
+   note moved to the half that survived. **This is wave 1's fifth defect again, in a new costume**, and
+   the repeat is the useful part: a refactor that makes a function's job smaller is exactly when a
+   wrapper becomes ornamental, and judgement did not notice either time.
+
 ## What is deliberately not here
 
 - **No language model, and no API call to one.** The bot is a policy plus a declared response curve.
@@ -203,11 +283,19 @@ shortcut as a property of contact centres.
 
 ## Still open
 
-- **A customer who is a person rather than a label.** Every trait in the generator is drawn per
-  contact, so the intracluster correlation wave 3 measures is approximately zero and the design effects
-  it prices are declared rather than observed. A persistent per-customer difficulty and patience is the
-  right fix, and it would move figures waves 1 and 2 already published — which is why it is a wave of
-  its own and not a patch.
+- **A frequent caller who is also a difficult one.** Wave 4 correlates a customer's difficulty and
+  patience and leaves their contact *frequency* independent of both, so the people who contact most
+  are not the people who are hardest to satisfy. In a real account they overlap, and the overlap is
+  what makes a frequent caller expensive. It would sharpen wave 4's Result 4 and leave Result 3 where
+  it is.
+- **Tail dependence rather than a shifted mean.** A Gaussian copula gives a customer who is difficult
+  a uniformly higher chance of being difficult again. Real escalations look like a heavy tail: mostly
+  ordinary, occasionally catastrophic. A copula with tail dependence is the honest shape and it is a
+  different parameter, not a different number.
+- **Clusters larger than two.** Every design effect in wave 4 is bounded by a factor of two because
+  this account's customers average 1.96 contacts. The same arithmetic at clusters of fifty - a study
+  randomised by depot, clinic or school - is a different order of problem, and quoting wave 4's modest
+  figures as reassurance there would be a misreading of them.
 - **Calibrating the classifier score, so the closed-form threshold has the input it assumes.** Wave 3
   shows the formula's ranking surviving and its levels failing on a margin. Isotonic or Platt scaling on
   a held-out period is the missing step, and it is the difference between a threshold that is optimal and

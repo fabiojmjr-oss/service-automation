@@ -37,6 +37,13 @@ something rather than against another containment rate. Every claim in these REA
 automation getting credit for work that was never work is a claim against that declared column, not
 against an observed one.
 
+The **two worlds** are both invented, and the correlation between them is declared. From wave 4 the
+account exists twice: once with every trait drawn per contact, and once with a share of each
+customer's difficulty and patience belonging to the person. That share — 0.25 and 0.10 — was chosen to
+sit inside the range an earlier wave had to guess at. Nothing here is evidence about how correlated a
+real account's contacts are. It is evidence about what a correlation of a declared size does to a
+measurement, and about how much of it survives into an outcome.
+
 Everything in the generator was designed to make a particular measurement situation visible — one
 contact reason that is mostly answerable and mostly self-serving, one that is neither, a residue whose
 handling time rises with difficulty, a repeat stream that an unresolved conversation produces, and a
@@ -91,6 +98,13 @@ A coluna `would_self_serve` — se o cliente teria chegado lá **sem ajuda algum
 a que nenhuma operação real possui. É por ela que a contenção pode ser confrontada com algo em vez de
 com outra taxa de contenção. Toda afirmação nestes READMEs sobre uma automação receber crédito por
 trabalho que nunca foi trabalho é uma afirmação contra essa coluna declarada, não contra uma observada.
+
+Os **dois mundos** são ambos inventados, e a correlação entre eles é declarada. A partir da onda 4 a
+conta existe duas vezes: uma com todo traço sorteado por contato e outra com uma parcela da
+dificuldade e da paciência de cada cliente pertencendo à pessoa. Essa parcela — 0,25 e 0,10 — foi
+escolhida para cair dentro da faixa que uma onda anterior teve de supor. Nada aqui é evidência sobre
+quão correlacionados são os contatos de uma conta real. É evidência sobre o que uma correlação de
+tamanho declarado faz a uma medição, e sobre quanto dela sobrevive até um desfecho.
 
 Tudo no gerador foi desenhado para tornar visível uma situação de medição específica — uma razão de
 contato em boa parte respondível e em boa parte autorresolvível, uma que não é nem uma coisa nem outra,

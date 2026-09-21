@@ -209,6 +209,12 @@ def test_the_recorded_defect_count_matches_the_roadmap() -> None:
         14: ("Fourteen", "Quatorze"),
         15: ("Fifteen", "Quinze"),
         16: ("Sixteen", "Dezesseis"),
+        17: ("Seventeen", "Dezessete"),
+        18: ("Eighteen", "Dezoito"),
+        19: ("Nineteen", "Dezenove"),
+        20: ("Twenty", "Vinte"),
+        21: ("Twenty-one", "Vinte e um"),
+        22: ("Twenty-two", "Vinte e dois"),
     }
     assert recorded in words, f"{recorded} defects recorded, and no word for it here"
     english_word, portuguese_word = words[recorded]

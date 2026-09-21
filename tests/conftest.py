@@ -6,13 +6,19 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from svclab.synth import Dataset, generate_dataset
+from svclab.synth import Dataset, correlated_dataset, generate_dataset
 
 
 @pytest.fixture(scope="session")
 def full() -> Dataset:
     """The published dataset, from the default seed."""
     return generate_dataset()
+
+
+@pytest.fixture(scope="session")
+def correlated(full: Dataset) -> Dataset:
+    """The same account in the world where a customer is a person, from the same noise."""
+    return correlated_dataset(full)
 
 
 @pytest.fixture

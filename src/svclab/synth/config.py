@@ -321,3 +321,44 @@ ROUTING = RoutingProfile(
     },
     defer_seconds=20.0,
 )
+
+
+@dataclass(frozen=True)
+class PopulationProfile:
+    """How much of a contact is the person and how much is the occasion.
+
+    Waves 1 to 3 draw every trait per contact, which makes a customer a label on a row rather than
+    somebody with a history. This profile is the correction, and it is stated as the quantity that
+    matters rather than as a coefficient: **the share of a trait's latent variance that belongs to
+    the customer.**
+
+    The mechanism is a Gaussian copula. A trait's percentile is pushed through the normal quantile,
+    the resulting latent value is split into a customer's part and an occasion's part with loadings
+    ``sqrt(rho)`` and ``sqrt(1 - rho)``, and the sum is pushed back out through the trait's own
+    quantile function. Two properties make it the right choice here and both are asserted in the
+    tests:
+
+    - the latent correlation between two contacts of one customer is **exactly** ``rho``;
+    - the trait's marginal distribution is **unchanged** - the same family, the same mean, the same
+      variance, the same support.
+
+    The second property is what makes the two worlds comparable. A convex combination of two draws
+    would have been simpler and it narrows the marginal spread by ``rho + (1 - rho)``'s cousin,
+    which would leave every difference between the worlds attributable to two causes at once. This
+    construction changes the correlation and nothing else.
+
+    Attributes:
+        difficulty_correlation: Share of a contact's latent difficulty that belongs to the customer.
+            0.25 sits inside the range wave 3 had to declare because it could not measure one.
+        patience_correlation: The same for patience, and deliberately different: one number for "how
+            correlated are contacts" is the simplification this wave exists to remove.
+    """
+
+    difficulty_correlation: float
+    patience_correlation: float
+
+
+#: Two declared correlations, and they are not equal on purpose. A design effect computed from one
+#: trait, applied to a comparison that turns on another, is one of the errors `svclab.population`
+#: exists to make visible.
+POPULATION = PopulationProfile(difficulty_correlation=0.25, patience_correlation=0.10)
