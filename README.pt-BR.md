@@ -443,7 +443,7 @@ python examples/09_the_threshold_fitted_on_the_answer.py
 
 ## Como as afirmações são mantidas honestas
 
-**431 testes, 100% de cobertura de linhas e de ramos.** 359 deles rodam em segundos e liberam cada push.
+**433 testes, 100% de cobertura de linhas e de ramos.** 361 deles rodam em segundos e liberam cada push.
 Os 72 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
 rodam o script de exemplo. Uma mudança que mova um número publicado quebra o build em vez de deixar o
 texto silenciosamente errado.
@@ -469,7 +469,7 @@ modo que a posição no stream depende de quantos valores são pedidos e não de
 responde. Essa regra é verificada contra o código-fonte, porque um repositório irmão publicou cifras
 que valiam numa máquina e mudavam numa instalação limpa.
 
-**E defeitos são registrados em vez de corrigidos em silêncio.** Trinta e sete até aqui, em
+**E defeitos são registrados em vez de corrigidos em silêncio.** Trinta e oito até aqui, em
 [`docs/ROADMAP.md`](docs/ROADMAP.md), cada um deles achado conectando os módulos, por um caso de
 controle ou verificando uma frase — nenhum lendo código. Dois valem a leitura. A sessão original cobrava
 um recontato como segundos extras em vez de como uma linha, o que torna o desvio aritmeticamente

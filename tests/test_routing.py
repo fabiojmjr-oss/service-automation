@@ -79,6 +79,14 @@ class TestTheDeferralDecision:
         with pytest.raises(KeyError, match="no threshold for"):
             defer_below(sample, full.routing_scores, {"rastreio": 0.5})
 
+    def test_a_key_that_is_not_a_column_is_an_error_rather_than_a_guess(
+        self, full: Dataset
+    ) -> None:
+        """Wave 9 made the key an argument, so a rule keyed on nothing has to be refused here too."""
+        sample = full.contacts.head(500)
+        with pytest.raises(KeyError, match="key the thresholds on"):
+            defer_below(sample, full.routing_scores, {"rastreio": 0.5}, "predicted_intent")
+
     def test_the_session_honours_the_deferral(self, full: Dataset) -> None:
         """The whole composition: the router marks, the session obeys, and the route column says so."""
         sample = full.contacts[~full.contacts["holdout"]].head(3_000)

@@ -18,6 +18,7 @@ from svclab.bot import THREE_TURNS, classifier_labels
 from svclab.calibration import (
     ALWAYS_DEFER,
     FORMULA_COLUMNS,
+    GRID,
     KEY_COLUMNS,
     OPTIMISM_COLUMNS,
     RELIABILITY_COLUMNS,
@@ -52,6 +53,16 @@ def treated_with_labels(data: Dataset) -> pd.DataFrame:
     frame = data.contacts[~data.contacts["holdout"]].copy()
     labels = classifier_labels(frame)
     return frame.merge(labels[["contact", "predicted_intent"]], on="contact", how="left")
+
+
+class TestTheGrid:
+    def test_the_grid_is_builtin_floats_and_not_numpy_scalars(self) -> None:
+        """`round` on a numpy scalar returns a numpy scalar, which is a type error on one Python of
+        the matrix and not on the one a local gate happens to run. Asserted on the type itself,
+        because equality cannot tell the two apart."""
+        assert GRID
+        assert all(type(value) is float for value in GRID)
+        assert GRID[0] == 0.0 and GRID[-1] == 1.0
 
 
 class TestThePeriodSplit:

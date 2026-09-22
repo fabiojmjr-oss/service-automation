@@ -586,6 +586,19 @@ against 10.9487 keyed on the truth, with 75 fewer misroutes.
    catch it: the two readings differ only where the classifier is wrong, and no test asked which of them
    had run. Found by needing the deployable rule badly enough to go and read the code.
 
+4. **A type that is only wrong on the Python the local gate did not run, for the second time in nine
+   waves.** `GRID` was built as `tuple(round(value, 2) for value in np.arange(...))`. `round` on a
+   numpy scalar returns a numpy scalar, so the constant's type is `tuple[floating[Any], ...]`, and
+   every default argument annotated `tuple[float, ...]` is an assignment error. Locally mypy inferred
+   `float` and the gate passed; on the 3.10 leg of the matrix it inferred `floating[Any]` and four
+   functions failed. Wave 1's `Series.idxmax` defect was the same shape - a annotation that depends on
+   which version of a stub is installed - and the lesson repeated is that a local gate is a sample of
+   one environment. Fixed by making the values builtin floats, and pinned by a test that asserts the
+   element **type** rather than its value, because equality cannot tell a numpy scalar from a float.
+   The same spelling survives in the tests and the examples, where mypy does not look and the values
+   are identical either way; it is left there rather than tidied, because a change no check can fail
+   is churn.
+
 One more thing was caught by its own test before publication and is recorded here only because the class
 of mistake is worth naming: the first isotonic fit ran pool-adjacent-violators over individual points
 rather than over pooled ties, so contacts sharing one score could be given different probabilities

@@ -59,7 +59,12 @@ from .score import (
 
 #: The thresholds swept, which is the grid wave 3 used. Coarse on purpose: a finer grid buys a
 #: better in-sample number and, being fitted noise, a worse out-of-sample one.
-GRID = tuple(round(value, 2) for value in np.arange(0.0, 1.01, 0.02))
+#:
+#: The ``float`` is not decoration. ``round`` on a numpy scalar returns a numpy scalar, so writing
+#: this the obvious way gives the constant the type ``tuple[floating[Any], ...]`` and every default
+#: argument annotated ``tuple[float, ...]`` becomes an error - on one Python of the matrix and not
+#: on the one the local gate happened to run.
+GRID = tuple(round(float(value), 2) for value in np.arange(0.0, 1.01, 0.02))
 
 #: Columns of the optimism table, one row per intent and one for the queue.
 OPTIMISM_COLUMNS = (

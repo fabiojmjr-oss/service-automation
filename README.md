@@ -441,7 +441,7 @@ python examples/09_the_threshold_fitted_on_the_answer.py
 
 ## How the claims are kept honest
 
-**431 tests, 100% statement and branch coverage.** 359 of them run in seconds and gate every push. The
+**433 tests, 100% statement and branch coverage.** 361 of them run in seconds and gate every push. The
 remaining 72 re-derive, from the generator, every figure quoted in every README on this repository,
 and run the example script. A change that moves a published number breaks the build instead of leaving
 the text quietly wrong.
@@ -467,7 +467,7 @@ position depends on how many values are asked for and not on which library versi
 is checked against the source, because a sibling repository published figures that held on one machine
 and moved on a clean install.
 
-**And defects are recorded rather than quietly fixed.** Thirty-seven so far, in
+**And defects are recorded rather than quietly fixed.** Thirty-eight so far, in
 [`docs/ROADMAP.md`](docs/ROADMAP.md), every one of them found by connecting the modules, by a control
 case or by verifying a sentence — none by reading code. Two are worth reading. The original session
 charged a repeat contact as extra seconds rather than as a row, which makes deflection arithmetically
