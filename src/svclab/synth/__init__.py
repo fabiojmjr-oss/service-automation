@@ -10,15 +10,18 @@ bot runs, so a bot is a deterministic function of the dataset. Two policies comp
 their policy and by nothing else.
 """
 
+from .churn import CHURN_DRAW_COLUMNS, churn_draws
 from .config import (
     CALIBRATION,
     CENTRE,
     CHAIN,
+    CHURN,
     CONCENTRATION,
     EQUAL_RATES,
     GRADERS,
     INTENTS,
     JUDGE,
+    NOBODY_LEAVES,
     POPULATION,
     QUALITY,
     ROUTING,
@@ -28,6 +31,7 @@ from .config import (
     CalibrationProfile,
     CentreProfile,
     ChainProfile,
+    ChurnProfile,
     ConcentrationProfile,
     GraderProfile,
     IntentProfile,
@@ -53,6 +57,8 @@ from .routing import ROUTING_SCORE_COLUMNS, accuracy_curve, routing_scores
 __all__ = [
     "CALIBRATION",
     "CENTRE",
+    "CHURN",
+    "CHURN_DRAW_COLUMNS",
     "CONTACT_COLUMNS",
     "GRADERS",
     "INTENTS",
@@ -62,6 +68,7 @@ __all__ = [
     "CUSTOMER_COLUMNS",
     "EQUAL_RATES",
     "JUDGE",
+    "NOBODY_LEAVES",
     "JUDGE_NOISE_COLUMNS",
     "POPULATION",
     "PANEL_NOISE_COLUMNS",
@@ -76,6 +83,7 @@ __all__ = [
     "CalibrationProfile",
     "CentreProfile",
     "ChainProfile",
+    "ChurnProfile",
     "ConcentrationProfile",
     "Dataset",
     "GraderProfile",
@@ -86,6 +94,7 @@ __all__ = [
     "WorkforceProfile",
     "accuracy_curve",
     "blend",
+    "churn_draws",
     "concentrated_dataset",
     "contacts",
     "correlated_contacts",

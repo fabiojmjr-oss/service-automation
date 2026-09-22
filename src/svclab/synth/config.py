@@ -524,3 +524,52 @@ CALIBRATION = CalibrationProfile(
     platt_steps=100,
     platt_tolerance=1e-10,
 )
+
+
+@dataclass(frozen=True)
+class ChurnProfile:
+    """Whether a customer stops coming back, and how an operation would try to notice.
+
+    Every wave so far has treated a customer who stops contacting as a customer who has nothing to
+    ask. Three separate waves then leaned on abandonment as the thing that keeps a model from
+    diverging - Erlang A's steady state, the occupancy ceiling satisfied by understaffing, and the
+    attrition loop's second regime - without ever pricing what the abandoning customer does next.
+
+    Attributes:
+        leave_after_abandoned: Probability a customer stops contacting after a session they
+            abandoned. The largest of the three, because giving up on a conversation is the
+            experience most likely to end the relationship.
+        leave_after_unresolved: Probability of leaving after a contact that ended unresolved without
+            being abandoned.
+        leave_after_resolved: Probability of leaving after a contact that was resolved. Not zero:
+            people move, close accounts and stop needing the service, and a churn model whose
+            baseline is zero attributes all of that to the contact centre.
+        silence_days: Days of silence at the end of the period after which an operation counts a
+            customer as churned. The only churn signal a real operation has, and a definition rather
+            than a measurement - which is why this module measures it as a gauge.
+    """
+
+    leave_after_abandoned: float
+    leave_after_unresolved: float
+    leave_after_resolved: float
+    silence_days: float
+
+
+#: Declared, not fitted. A customer who abandons a conversation is twelve times more likely to
+#: leave than one whose problem was solved, and the silence rule is a third of the month - long
+#: enough that a monthly contacter is not counted as gone, short enough to be a usable signal.
+CHURN = ChurnProfile(
+    leave_after_abandoned=0.06,
+    leave_after_unresolved=0.04,
+    leave_after_resolved=0.005,
+    silence_days=10.0,
+)
+
+#: The control: a world nobody leaves. Every figure computed in it has to equal the base world's
+#: exactly, because a churn model that costs something when churn is impossible is inventing losses.
+NOBODY_LEAVES = ChurnProfile(
+    leave_after_abandoned=0.0,
+    leave_after_unresolved=0.0,
+    leave_after_resolved=0.0,
+    silence_days=10.0,
+)

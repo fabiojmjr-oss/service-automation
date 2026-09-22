@@ -1,16 +1,16 @@
-# Nove achados, para quem assina o business case
+# Dez achados, para quem assina o business case
 
 *[English](FINDINGS.md)*
 
 O [README raiz](../README.pt-BR.md) apresenta cada achado ao lado da aritmética que o produziu. Este
-documento faz o outro trabalho: diz, para cada um dos nove, **em que decisão o achado desemboca, o que
+documento faz o outro trabalho: diz, para cada um dos dez, **em que decisão o achado desemboca, o que
 uma operação competente teria decidido sem ele, e o que fazer em vez disso.** Nenhuma cifra nova aparece
 aqui. Todo número abaixo está citado do README, que por sua vez está sob teste — uma cifra que se moveu
 quebra o build antes de chegar a esta página.
 
 Um aviso antes da lista. Estes são achados sobre **uma conta sintética declarada**, gerada pelo
 `svclab.synth` a partir de parâmetros escritos. Não são estatísticas de mercado e não são benchmark. O
-que se transfere é o **método** — e, em cinco dos nove casos, uma **forma fechada** que vale em qualquer
+que se transfere é o **método** — e, em cinco dos dez casos, uma **forma fechada** que vale em qualquer
 conta, não só nesta.
 
 | # | A decisão em que desemboca | A cifra que decide |
@@ -24,6 +24,7 @@ conta, não só nesta.
 | 7 | Qual restrição decidiu o headcount | Teto de ocupação sozinho é satisfeito por subdimensionamento |
 | 8 | A diferença entre contagem de atendentes e folha | Onze atendentes custam doze pessoas, por ponto fixo |
 | 9 | Se corrigir o insumo de um modelo ou o modelo | A fórmula erra 7,33% num score perfeitamente calibrado |
+| 10 | Se uma cifra de eficiência é uma | A política que perde mais clientes economiza mais horas |
 
 ## 1. O KPI ranqueia as políticas ao contrário
 
@@ -321,6 +322,54 @@ compromisso.
 
 Confira: [`examples/09_the_threshold_fitted_on_the_answer.py`](../examples/09_the_threshold_fitted_on_the_answer.py) ·
 [`svclab.calibration`](../src/svclab/calibration/README.md)
+
+## 10. A válvula de alívio em que todo modelo se apoiava era o cliente indo embora
+
+**A decisão.** Se uma cifra de eficiência é uma cifra de eficiência — e em que unidade um programa de
+automação deve ser contabilizado.
+
+**O que o case dizia.** Nada, três vezes. O achado 3 chegou a uma fila estável *porque* clientes
+desistiam. O achado 7 manteve uma meta de ocupação *porque* os clientes que abandonam mantêm a ocupação
+baixa. O segundo regime do achado 8 foi alcançado *perdendo clientes*. Toda vez a perda foi nomeada e
+nunca contada, porque segundos, atendentes e horas não têm como segurá-la.
+
+**O que a conta diz.** Comece pela medição, porque ela falha primeiro. Ninguém vê um cliente ir embora;
+uma operação vê **silêncio**. Dez dias dele, sobre **16.195** clientes dos quais **775** realmente
+saíram, sinalizam **8.040** pessoas com sensibilidade de **0,6477** e especificidade de **0,5112**. Ou
+seja, **93,76%** dos clientes que o painel sinaliza não saíram — e como o índice de Youden é o fator
+exato pelo qual um avaliador binário multiplica uma diferença, uma comparação de duas políticas por esta
+taxa de churn reporta **15,89%** da diferença real — um quinto dos **69,45%** que o achado 2 chamou de
+problema de instrumento.
+
+Pior, a regra não se conserta restringindo-a a quem contata com frequência. O índice **tem pico no
+meio** — **0,1008** com um contato, **0,2678** com três, **0,0928** com quatro ou mais — porque falha
+nos dois extremos por razões opostas: um cliente de um contato é silencioso por construção
+(especificidade **0,3368**), e um cliente frequente que sai tarde ainda tem contato recente
+(sensibilidade **0,2791**). Uma janela de silêncio é uma afirmação sobre frequência de contato antes de
+ser uma afirmação sobre sair.
+
+Depois a aritmética, que é a parte que deveria mudar uma reunião. A política que afasta mais gente lança
+a **maior** redução de horas humanas: **1.123** clientes perdidos e **59,49** horas economizadas, contra
+**257** e **24,49** da fila humana — monótono nas quatro políticas. Cada uma dessas horas chega ao
+relatório como eficiência, e a contenção recalculada sobre os contatos sobreviventes se move
+**0,00017**, porque numerador e denominador caem juntos. O ranking por clientes perdidos é exatamente o
+ranking por contenção do achado 1. **Uma hora economizada custa 18,88 clientes.**
+
+E a válvula, precificada: os seis atendentes "perfeitamente estáveis" do achado 3 gastam **557,74**
+clientes por mês contra **67,93** dos onze que cumprem todos os tetos — **489,81** a mais, que cinco
+atendentes compram de volta a **97,96** clientes por mês por atendente. Essa é a quantidade sobre a qual
+o achado 8 disse que todo o seu caso repousava e não podia produzir.
+
+**O que fazer em vez disso.** Ponha uma medida de retenção ao lado de cada medida de eficiência, e
+qualifique-a como instrumento antes de citá-la — com índice de Youden de 0,1589 uma comparação de churn
+não é evidência. Nunca aceite uma melhora de custo por contato sem a contagem de clientes que divide o
+mesmo denominador. E contabilize uma automação em clientes além de em horas, porque **horas são uma
+quantidade mensal e clientes não são**: nove destes achados foram construídos numa unidade que não
+consegue expressar a perda, e a única razão pela qual levou dez para notar é que a unidade nunca esteve
+errada sobre nada mais.
+
+Confira: [`examples/10_the_customer_who_stopped_calling.py`](../examples/10_the_customer_who_stopped_calling.py) ·
+[`svclab.churn`](../src/svclab/churn/README.md)
 
 ## O que nada disso diz
 

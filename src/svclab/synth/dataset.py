@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from .churn import churn_draws
 from .config import CENTRE, CHAIN, CONCENTRATION, SEED, ConcentrationProfile
 from .contacts import contacts, intent_truth
 from .customers import correlated_contacts, customer_components
@@ -37,8 +38,10 @@ class Dataset:
             unused by :func:`generate_dataset`'s own world - :func:`correlated_dataset` is what
             consumes it.
         return_draws: One row per contact and further attempt: whether the customer comes back
-            again, and whether the human resolves it that time. Drawn last of all, and spent only by
-            a run that is given a chain longer than the one repeat waves 1 to 5 allow.
+            again, and whether the human resolves it that time. Drawn after the components, and
+            spent only by a run that is given a chain longer than the one repeat waves 1 to 5 allow.
+        churn_draws: One row per contact: how unlucky the experience has to be for the customer to
+            stop coming back. Drawn last of all, for the fourth time in four waves.
     """
 
     contacts: pd.DataFrame
@@ -48,6 +51,7 @@ class Dataset:
     routing_scores: pd.DataFrame
     customer_components: pd.DataFrame
     return_draws: pd.DataFrame
+    churn_draws: pd.DataFrame
 
 
 def generate_dataset(seed: int = SEED) -> Dataset:
@@ -77,6 +81,9 @@ def generate_dataset(seed: int = SEED) -> Dataset:
     # And the chain's draws last of all, for the third time in three waves: a table drawn at the end
     # of the stream cannot move a figure that was published before it existed.
     chain = return_draws(rng, CENTRE, CHAIN)
+    # And the leave decisions after those, for the fourth time in four waves. Wave 10 is the first
+    # thing here that can remove a contact, so it had to be the last thing drawn.
+    leaving = churn_draws(rng, CENTRE)
     return Dataset(
         contacts=table,
         intent_truth=intent_truth(table),
@@ -85,6 +92,7 @@ def generate_dataset(seed: int = SEED) -> Dataset:
         routing_scores=scores,
         customer_components=components,
         return_draws=chain,
+        churn_draws=leaving,
     )
 
 
@@ -111,6 +119,7 @@ def correlated_dataset(data: Dataset) -> Dataset:
         routing_scores=scores_from(table, data.routing_scores["u_score"].to_numpy(dtype=float)),
         customer_components=data.customer_components,
         return_draws=data.return_draws,
+        churn_draws=data.churn_draws,
     )
 
 
@@ -147,4 +156,5 @@ def concentrated_dataset(
         routing_scores=data.routing_scores,
         customer_components=data.customer_components,
         return_draws=data.return_draws,
+        churn_draws=data.churn_draws,
     )

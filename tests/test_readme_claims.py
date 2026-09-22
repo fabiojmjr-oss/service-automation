@@ -54,6 +54,16 @@ from svclab.chain import (
     tail_table,
     time_table,
 )
+from svclab.churn import (
+    departures,
+    detection_by_frequency,
+    detection_table,
+    experience_of,
+    policy_table,
+    silence_flag,
+    surviving,
+    valve_table,
+)
 from svclab.concentration import burden_table, concentration_table, precision_table
 from svclab.containment import containment_table, deflection, selection_profile
 from svclab.experiment import intracluster_correlation, sizing_table
@@ -91,8 +101,10 @@ from svclab.synth import (
     CALIBRATION,
     CENTRE,
     CHAIN,
+    CHURN,
     EQUAL_RATES,
     INTENTS,
+    NOBODY_LEAVES,
     POPULATION,
     QUALITY,
     ROUTING,
@@ -1625,3 +1637,151 @@ def test_the_deployable_key_beats_the_one_wave_three_priced(
     assert deployable * 12_709 / 3600.0 == pytest.approx(42.08, abs=5e-3)
     assert deployable * 31_802 / 3600.0 == pytest.approx(105.31, abs=5e-3)
     assert deployable / 11.5552 == pytest.approx(1.0317, abs=5e-5)
+
+
+# --- Wave 10: the outcome that looks like a saving, in svclab.churn ----------------------------
+
+
+#: Abandonment rates waves 3, 8 and 7 land on, loosest first.
+WAVE_TEN_VALVE = (0.2923, 0.2100, 0.1434, 0.0356)
+
+
+@pytest.fixture(scope="module")
+def churned(arms: tuple, full: Dataset) -> tuple:
+    """Departures under wave 1's shipped policy, the contacts that survive, and the silence rule."""
+    treated, _, outcomes, _ = arms
+    left = departures(treated, outcomes["three-turns"], full.churn_draws)
+    kept = surviving(treated, left)
+    return treated, outcomes, left, kept, silence_flag(kept)
+
+
+def test_the_experiences_of_the_month_are_what_is_published(churned: tuple) -> None:
+    treated, outcomes, _, _, _ = churned
+    table = experience_of(treated, outcomes["three-turns"])
+    published = {
+        "abandoned": (10_544, 0.3316),
+        "unresolved": (1_048, 0.0330),
+        "resolved": (20_210, 0.6355),
+    }
+    for name, (count, share) in published.items():
+        inside = table["experience"] == name
+        assert int(inside.sum()) == count, name
+        assert float(inside.mean()) == pytest.approx(share, abs=5e-5), name
+
+
+def test_the_churn_gauge_is_what_is_published(churned: tuple) -> None:
+    _, _, left, _, flagged = churned
+    row = detection_table(left, flagged).iloc[0]
+    assert int(row["customers"]) == 16_195
+    assert int(row["left"]) == 775
+    assert float(row["prevalence"]) == pytest.approx(0.0479, abs=5e-5)
+    assert int(row["flagged"]) == 8_040
+    assert float(row["sensitivity"]) == pytest.approx(0.6477, abs=5e-5)
+    assert float(row["specificity"]) == pytest.approx(0.5112, abs=5e-5)
+    assert float(row["youden"]) == pytest.approx(0.1589, abs=5e-5)
+    assert float(row["precision"]) == pytest.approx(0.0624, abs=5e-5)
+    assert 1.0 - float(row["precision"]) == pytest.approx(0.9376, abs=5e-5)
+    # The identity is wave 2's, so the two transmissions are comparable: 0.6945 there, this here.
+    assert float(row["youden"]) / 0.6945 == pytest.approx(0.2288, abs=5e-4)
+
+
+def test_the_gauge_by_frequency_is_what_is_published(churned: tuple) -> None:
+    _, _, left, _, flagged = churned
+    published = {
+        "1": (7_029, 411, 0.7640, 0.3368, 0.1008),
+        "2": (5_184, 222, 0.5450, 0.5613, 0.1063),
+        "3": (2_629, 99, 0.5556, 0.7123, 0.2678),
+        "4+": (1_353, 43, 0.2791, 0.8137, 0.0928),
+    }
+    table = detection_by_frequency(left, flagged).set_index("contacts_seen")
+    for band, (customers, gone, sensitive, specific, index) in published.items():
+        row = table.loc[band]
+        assert int(row["customers"]) == customers, band
+        assert int(row["left"]) == gone, band
+        assert float(row["sensitivity"]) == pytest.approx(sensitive, abs=5e-5), band
+        assert float(row["specificity"]) == pytest.approx(specific, abs=5e-5), band
+        assert float(row["youden"]) == pytest.approx(index, abs=5e-5), band
+
+    # The index peaks in the middle, which is the result: it is not monotone in the frequency.
+    assert float(table.loc["3", "youden"]) > float(table.loc["1", "youden"])
+    assert float(table.loc["3", "youden"]) > float(table.loc["4+", "youden"])
+    # And it fails at the two ends for opposite reasons.
+    assert float(table.loc["1", "sensitivity"]) > float(table.loc["4+", "sensitivity"])
+    assert float(table.loc["1", "specificity"]) < float(table.loc["4+", "specificity"])
+
+
+def test_what_each_policy_costs_in_customers_is_what_is_published(
+    churned: tuple, full: Dataset
+) -> None:
+    treated, outcomes, _, _, _ = churned
+    published = {
+        "human-only": (257, 0.0159, 198, 3_645.6417, 3_621.1484, 24.4934, 5.7183, 0.0000),
+        "guarded": (615, 0.0380, 476, 2_861.5373, 2_817.0707, 44.4666, 4.3382, 0.4886),
+        "three-turns": (775, 0.0479, 590, 2_730.4280, 2_678.8196, 51.6083, 3.9955, 0.6065),
+        "patient": (1_123, 0.0693, 863, 2_316.7766, 2_257.2912, 59.4854, 3.1782, 0.8169),
+    }
+    table = policy_table(treated, outcomes, full.churn_draws).set_index("policy")
+    for policy, values in published.items():
+        gone, share, contacts, before, after, saved, minutes, containment = values
+        row = table.loc[policy]
+        assert int(row["customers"]) == 16_195, policy
+        assert int(row["left"]) == gone, policy
+        assert float(row["share_left"]) == pytest.approx(share, abs=5e-5), policy
+        assert int(row["contacts_lost"]) == contacts, policy
+        assert float(row["human_hours"]) == pytest.approx(before, abs=5e-4), policy
+        assert float(row["human_hours_after"]) == pytest.approx(after, abs=5e-4), policy
+        assert float(row["hours_saved"]) == pytest.approx(saved, abs=5e-4), policy
+        assert float(row["minutes_per_customer_lost"]) == pytest.approx(minutes, abs=5e-4), policy
+        assert float(row["session_containment"]) == pytest.approx(containment, abs=5e-5), policy
+
+    # The hours saved are monotone in the customers lost, which is the finding.
+    ordered = table.sort_values("left")
+    assert list(ordered.index) == ["human-only", "guarded", "three-turns", "patient"]
+    assert (ordered["hours_saved"].diff().dropna() > 0.0).all()
+    # And that order is wave 1's containment ranking, exactly.
+    assert list(table.sort_values("session_containment").index) == list(ordered.index)
+    assert float(table.loc["patient", "left"]) / float(table.loc["human-only", "left"]) == (
+        pytest.approx(4.3696, abs=5e-4)
+    )
+    # Containment cannot see the loss: the numerator and the denominator fall together.
+    drift = float(table.loc["three-turns", "session_containment"]) - float(
+        table.loc["three-turns", "session_containment_after"]
+    )
+    assert drift == pytest.approx(0.00017, abs=5e-6)
+    assert 60.0 / float(table.loc["patient", "minutes_per_customer_lost"]) == pytest.approx(
+        18.88, abs=5e-3
+    )
+
+
+def test_a_world_nobody_leaves_costs_nothing_at_all(churned: tuple, full: Dataset) -> None:
+    """The control the wave rests on, asserted by identity rather than by tolerance."""
+    treated, outcomes, _, _, _ = churned
+    left = departures(treated, outcomes["three-turns"], full.churn_draws, NOBODY_LEAVES)
+    assert int(left["left"].sum()) == 0
+    assert surviving(treated, left).equals(treated)
+
+
+def test_the_valve_priced_in_customers_is_what_is_published(churned: tuple) -> None:
+    treated, _, left, _, _ = churned
+    published = {
+        0.2923: (9_295.7246, 557.7435, 0.0344),
+        0.2100: (6_678.4200, 400.7052, 0.0247),
+        0.1434: (4_560.4068, 273.6244, 0.0169),
+        0.0356: (1_132.1512, 67.9291, 0.0042),
+    }
+    table = valve_table(WAVE_TEN_VALVE, len(treated), int(len(left)), CHURN).set_index(
+        "abandonment"
+    )
+    for rate, (abandoned, lost, share) in published.items():
+        row = table.loc[rate]
+        assert float(row["abandoned"]) == pytest.approx(abandoned, abs=5e-4), rate
+        assert float(row["customers_lost"]) == pytest.approx(lost, abs=5e-4), rate
+        assert float(row["share_of_customers"]) == pytest.approx(share, abs=5e-5), rate
+
+    gap = float(table.loc[0.2923, "customers_lost"]) - float(table.loc[0.0356, "customers_lost"])
+    assert gap == pytest.approx(489.8144, abs=5e-4)
+    assert gap / 5.0 == pytest.approx(97.9629, abs=5e-4)
+    occupancy_only = float(table.loc[0.1434, "customers_lost"]) - float(
+        table.loc[0.0356, "customers_lost"]
+    )
+    assert occupancy_only == pytest.approx(205.6953, abs=5e-4)

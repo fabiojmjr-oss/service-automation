@@ -607,6 +607,66 @@ repeated score failed on the first run. It moved no published figure on this acc
 worth noticing — the account's scores are nearly all distinct, so the defect was invisible in every
 aggregate and visible only in a four-point example.
 
+## Wave 10 — the outcome that looks like a saving *(complete)*
+
+Waves 3, 7 and 8 each leaned on abandonment as the thing that keeps a model from diverging, each noted
+that it is the thing the business is trying not to do, and none of them could say how much of it
+happened. This file recorded that as the most consequential gap it had: "a chain that ends because the
+customer left looks identical here to one that ends because the customer was helped".
+
+`svclab.churn` closes it, and the closing is also the repository's own indictment.
+
+- `svclab.synth.churn_draws` — one uniform per contact, drawn **last of everything** for the fourth time
+  in four waves, so the wave that can remove a contact cannot move a figure published before it.
+- `departure.py` — `experience_of` (the worst thing that happened, and the worst dominates),
+  `leave_chance`, `departures` (the sequential rule, attributed to the contact that caused it),
+  `surviving`, `silence_flag`, `detection_table` and `detection_by_frequency` (the churn rate as a gauge
+  study), `policy_table` and `valve_table`.
+- `CHURN` declares the curve; `NOBODY_LEAVES` is the control, and the surviving contacts in it are
+  asserted to be the **identical frame** rather than a close one.
+
+**Result 1 — the churn rate is a gauge that reports 6% of what it flags.** Ten days of silence, on
+16,195 customers of whom 775 left: sensitivity 0.6477, specificity 0.5112, precision 0.0624. So 93.76%
+of the flagged customers stayed, and because the Youden index is the exact attenuation factor, a
+comparison of two policies on this rate transmits 15.89% of the real gap — a fifth of what wave 2's
+quality panel transmitted, by the same identity.
+
+**Result 2 — the rule fails at both ends, for opposite reasons.** The index peaks in the middle: 0.1008
+at one contact, 0.2678 at three, 0.0928 at four or more. Specificity 0.3368 at one contact (silence is
+what one contact means) and sensitivity 0.2791 at four or more (a frequent customer who leaves late
+still has a recent contact).
+
+**Result 3 — losing customers reduces the bill and containment cannot see it.** Hours saved are monotone
+in customers lost: 1,123 customers and 59.49 hours for `patient` against 257 and 24.49 for the human
+queue. The ranking by customers lost is wave 1's containment ranking exactly. Containment recomputed on
+the survivors moves by 0.00017. One saved hour costs 18.88 customers.
+
+**Result 4 — the valve priced in people.** Wave 3's stable six agents spend 557.74 customers a month
+against 67.93 for wave 7's compliant eleven: 489.81 more, or 97.96 customers a month per agent. Which
+supplies the quantity wave 8 said its whole case rested on and could not produce.
+
+**And the unit was wrong for nine waves.** 590 contacts disappear, 1.86% of the month, because the
+window truncates a permanent loss into a fortnight. Seconds, sessions, agents and hours are monthly
+quantities; customers are not.
+
+### Defects found and recorded
+
+1. **Containment recomputed locally instead of through the module that defines it.** The first
+   `policy_table` called every bot-routed session contained - `route == "bot"` - which reports the
+   human-only queue at 0.9582 and is not any of the four definitions wave 1 spent a whole wave
+   separating. It was caught by reading the number against wave 1's published 0.0000 rather than by any
+   test, because no test asked the new module to agree with the old one. The fix is to call
+   `containment_table`, and the claims test now asserts wave 1's figures **through wave 10's table** so
+   the two can never disagree again. This is the defect the repository is most about: a metric is a
+   definition, and a second implementation of a definition is a second definition.
+2. **A prediction about the silence rule that was backwards in shape.** The module was written expecting
+   the rule's Youden index to rise with contact frequency - "silence is only a signal for customers who
+   contact often enough for silence to be surprising". It peaks in the middle instead. The prediction had
+   one failure mode in mind, the one-contact customer who is silent by construction, and missed the
+   opposite one entirely: a frequent customer who leaves late in the month is *never* silent long enough
+   to be caught, so sensitivity collapses at the top. Monotone was the wrong shape to expect from a rule
+   that needs silence to accumulate inside a fixed window.
+
 ## The executive brief — `FINDINGS.md` *(complete)*
 
 Eight waves of findings were readable only in the order they were built, next to the arithmetic that
@@ -653,6 +713,20 @@ competent operation would have decided without it, and what to do instead.
 
 ## Still open
 
+- **A leaving decision that accumulates.** Wave 10 gives each contact its own coin at its own declared
+  rate, so two bad experiences are two independent chances rather than a relationship wearing out. A
+  threshold model would punish exactly the policies wave 4 showed fail the same person twice, and it is
+  the one change most likely to move wave 10's ranking.
+- **A departure that costs more than its contacts.** Nothing here models word of mouth, a complaint to a
+  regulator, or an effect on anybody else's propensity to contact. Each makes the loss larger than
+  published, and none of them is visible in a month.
+- **The curve itself.** 6% after abandoning, 4% after unresolved, 0.5% after resolved: three declared
+  numbers carrying every figure in wave 10. In a real operation they are the first thing worth
+  estimating and the hardest, and nothing here estimates them.
+- **A window longer than a month.** Every wave measures one month, which truncates a permanent loss into
+  whatever fortnight the customer had left. The fix is not a longer simulation but a different unit, and
+  wave 10 is the first wave to say so rather than to assume the month away.
+
 - **A benefit conditioned on more than the intent.** Wave 9's amended threshold uses one benefit per
   intent, averaged over contacts whose resolvability differs, which is why it lands within a fraction of
   a per cent of the sweep instead of on it. A benefit conditioned on the score itself would close more of
@@ -688,9 +762,6 @@ competent operation would have decided without it, and what to do instead.
 - **An escalation path that does not improve.** Wave 6's lift compounds and clips at one, so its chains
   always end. An operation whose second line is no better than its first has an unbounded tail, and
   that is the case the closed form in Result 2 prices and the simulation cannot reach.
-- **Churn as an outcome.** A chain that ends because the customer left looks identical here to one that
-  ends because the customer was helped. The difference is the only one the business cares about, and
-  nothing in this repository can tell them apart.
 - **More volume, not the same volume rearranged.** Wave 5 redistributes 31,802 contacts among fewer
   people, so every figure in it is the pure regrouping effect. An account whose frequent callers are
   difficult has *more* contacts than one whose are not, and that second effect is additive to

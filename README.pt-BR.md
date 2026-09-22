@@ -389,6 +389,54 @@ diagnóstico não sobrevive a ele.
   tratado do mês. Duas correções, sinais opostos, quase se cancelando: a cifra sobrevive por uma razão que
   a onda 3 não nomeou.
 
+## E o que impedia cada modelo de divergir era o cliente indo embora
+
+Três ondas se apoiaram na mesma válvula de alívio sem precificá-la. Erlang A alcança um estado
+estacionário **porque** clientes desistem; um teto de ocupação é satisfeito por subdimensionamento
+**porque** os clientes que abandonam são o que mantém a ocupação baixa; o segundo regime do laço de
+rotatividade é alcançado **perdendo clientes**. Toda vez a nota era que abandono é aquilo que o negócio
+tenta não fazer. Não havia moeda para dizer quanto disso acontecia, então agora há.
+
+- **Uma taxa de churn é um instrumento, e este reporta 6% do que sinaliza.** Ninguém consegue ver um
+  cliente ir embora; uma operação vê **silêncio**. Dez dias dele, sobre 16.195 clientes dos quais
+  **775** realmente saíram, sinalizam 8.040 pessoas com sensibilidade de **0,6477** e especificidade de
+  **0,5112**. Ou seja, **93,76% dos clientes que o painel sinaliza não saíram** — e como o índice de
+  Youden é o fator exato pelo qual um avaliador binário multiplica uma diferença, uma comparação de duas
+  políticas por esta taxa de churn reporta **15,89%** da diferença real, seu índice sendo
+  **0,1589**. A onda 2 achou um painel de
+  qualidade transmitindo 69,45% e chamou isso de problema de instrumento. Esta é a mesma identidade a
+  **um quinto** daquela transmissão.
+- **E a regra é inútil nos dois extremos, por razões opostas.** O índice não é monótono na frequência de
+  contato: **0,1008** com um contato, 0,1063 com dois, **0,2678** com três, **0,0928** com quatro ou
+  mais. Com um contato ela não vê quem fica — ser silencioso é o que um contato significa, então a
+  especificidade é 0,3368. Com quatro ou mais ela não vê quem sai — um cliente frequente que sai tarde
+  ainda tem contato recente, então a sensibilidade colapsa para 0,2791. **Uma janela de silêncio é uma
+  afirmação sobre frequência de contato antes de ser uma afirmação sobre sair**, e uma janela para toda
+  a carteira são dois instrumentos usando um nome.
+- **Perder clientes reduz a conta, e o KPI não vê.** A política que afasta mais gente lança a maior
+  redução de horas humanas: o `patient` perde **1.123** clientes e economiza **59,49** horas, contra
+  **257** e 24,49 da fila humana — monótono nas quatro políticas, e cada uma dessas horas chega ao
+  relatório como eficiência. O ranking por clientes perdidos **é o ranking por contenção da onda 1,
+  exatamente**: um quarto ranking das mesmas quatro políticas, o segundo que concorda com o KPI enquanto
+  discorda de resolução e de tempo. E a contenção, recalculada sobre os contatos sobreviventes, se move
+  **0,00017** — numerador e denominador caem juntos, que é o que uma razão faz quando se removem as
+  pessoas sobre as quais ela é uma razão. A taxa de câmbio, para ler em voz alta: na política que
+  maximiza contenção **uma hora economizada custa 18,88 clientes**.
+- **A válvula que três ondas usaram, precificada em gente.** Os seis atendentes "perfeitamente estáveis"
+  da onda 3, a 29,23% de abandono, gastam **557,74** clientes por mês; os onze atendentes da onda 7, a
+  3,56%, gastam **67,93**. Então estabilidade custa **489,81 clientes a mais por mês** que conformidade,
+  e a meta de ocupação de aparência humana da onda 7 perseguida sozinha custa **205,70 a mais**. Cinco
+  atendentes compram isso de volta: **97,96 clientes por mês por atendente.** O que fecha o que a onda 8
+  deixou aberto — ela precificou um atendente extra em 12 pessoa-mês contra 2,33 devolvidos e disse que
+  o caso repousa inteiramente sobre o que uma saída custa *fora* da fila. Essa é a quantidade. Continua
+  não havendo dinheiro neste repositório, então o preço fica com o leitor.
+- **E a unidade estava errada por nove ondas.** Só **590** contatos desaparecem — 1,86% do mês — porque
+  um cliente que sai no dia três perde vinte e sete dias aqui e o resto da vida numa operação. Segundos,
+  sessões, atendentes e horas são quantidades mensais, e um mês é a janela em que toda onda aqui mediu.
+  Clientes não são mensais. **Nove ondas construíram uma conta cada vez mais cuidadosa numa unidade que
+  não consegue expressar a perda**, e a única razão pela qual levou dez para notar é que a unidade nunca
+  esteve errada sobre nada mais.
+
 ## Módulos
 
 | Módulo | O que decide |
@@ -405,6 +453,7 @@ diagnóstico não sobrevive a ele.
 | [`svclab.chain`](src/svclab/chain/README.md) | O que custa um contato que volta duas vezes, quão longa é de fato uma cadeia de retornos e a forma fechada que diz por quê, e o terceiro ranking das políticas — dias até resolver, que nenhuma taxa contém. |
 | [`svclab.planning`](src/svclab/planning/README.md) | Que headcount um conjunto de tetos declarados compra em vez do que uma meta única reporta, qual dos tetos de fato decidiu, como isso muda com o tamanho da fila, e a que distância de furar o plano escolhido está. |
 | [`svclab.calibration`](src/svclab/calibration/README.md) | Se a forma fechada de um limiar de roteamento recebeu o insumo errado ou está sem um termo, o que um limiar ajustado num período custa no seguinte, e em qual rótulo uma regra que uma implantação consegue rodar precisa ser chaveada. |
+| [`svclab.churn`](src/svclab/churn/README.md) | O que uma automação custa em clientes em vez de em segundos: se a taxa de churn que uma operação consegue medir é sequer um instrumento, quais políticas perdem mais gente, e o que gasta o abandono que três ondas usaram como alívio. |
 | [`svclab.workforce`](src/svclab/workforce/README.md) | O que uma ocupação custa em pessoas em vez do que um teto proíbe: a folha atrás de uma contagem de atendentes, a taxa de câmbio entre ocupação e contratação, e se o laço de rotatividade que ela fecha alguma vez escapa. |
 
 Todo README de módulo é bilíngue e traz uma seção **Premissas e limitações**, porque uma cifra sem suas
@@ -421,6 +470,7 @@ premissas não é um resultado.
 | [`examples/05_the_frequent_caller.py`](examples/05_the_frequent_caller.py) | Os mesmos contatos reagrupados em clientes que contatam em taxas diferentes, com os pesados correlacionados aos difíceis: a forma dos grupos, o efeito de desenho que retorna, quem paga por ele, e o que custa à precisão da estimativa da onda 1. |
 | [`examples/06_the_contact_that_came_back_twice.py`](examples/06_the_contact_that_came_back_twice.py) | A cauda que cinco ondas truncaram, rodada até seu fim declarado: quantas tentativas um contato leva, a série geométrica que diz quando isso importa, o que a cadeia custa a cada política, e o ranking que tem tempo dentro. |
 | [`examples/07_the_constraint_nobody_declared.py`](examples/07_the_constraint_nobody_declared.py) | Os três tetos declarados em vez de reportados: o que cada um compra sozinho, no que a fila estável da onda 3 falha, onde a economia de escala para, e quanto espaço sobra no plano escolhido. |
+| [`examples/10_the_customer_who_stopped_calling.py`](examples/10_the_customer_who_stopped_calling.py) | A válvula de alívio precificada em gente: com o que o mês deixou seus clientes, a regra de silêncio medida como instrumento e estratificada por frequência de contato, o que cada política custa em clientes ao lado do que custa em horas, e a retenção que um atendente extra compra. |
 | [`examples/09_the_threshold_fitted_on_the_answer.py`](examples/09_the_threshold_fitted_on_the_answer.py) | A forma fechada recebendo o insumo que ela assume e depois o termo que lhe faltava: a confiabilidade do score, as quatro versões dele precificadas contra uma varredura, o que um limiar custa num período que nunca viu, e a regra chaveada no rótulo que um roteador consegue ler. |
 | [`examples/08_the_payroll_behind_the_plan.py`](examples/08_the_payroll_behind_the_plan.py) | O teto de ocupação precificado em pessoas: a folha que cada plano de fato exige, o que um ponto de ocupação compra em contratação, a fila onde não há o que trocar, e quão mais forte a curva de rotatividade teria de ser para espiralar. |
 
@@ -439,12 +489,13 @@ python examples/06_the_contact_that_came_back_twice.py
 python examples/07_the_constraint_nobody_declared.py
 python examples/08_the_payroll_behind_the_plan.py
 python examples/09_the_threshold_fitted_on_the_answer.py
+python examples/10_the_customer_who_stopped_calling.py
 ```
 
 ## Como as afirmações são mantidas honestas
 
-**433 testes, 100% de cobertura de linhas e de ramos.** 361 deles rodam em segundos e liberam cada push.
-Os 72 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
+**471 testes, 100% de cobertura de linhas e de ramos.** 392 deles rodam em segundos e liberam cada push.
+Os 79 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
 rodam o script de exemplo. Uma mudança que mova um número publicado quebra o build em vez de deixar o
 texto silenciosamente errado.
 
@@ -469,7 +520,7 @@ modo que a posição no stream depende de quantos valores são pedidos e não de
 responde. Essa regra é verificada contra o código-fonte, porque um repositório irmão publicou cifras
 que valiam numa máquina e mudavam numa instalação limpa.
 
-**E defeitos são registrados em vez de corrigidos em silêncio.** Trinta e oito até aqui, em
+**E defeitos são registrados em vez de corrigidos em silêncio.** Quarenta até aqui, em
 [`docs/ROADMAP.md`](docs/ROADMAP.md), cada um deles achado conectando os módulos, por um caso de
 controle ou verificando uma frase — nenhum lendo código. Dois valem a leitura. A sessão original cobrava
 um recontato como segundos extras em vez de como uma linha, o que torna o desvio aritmeticamente

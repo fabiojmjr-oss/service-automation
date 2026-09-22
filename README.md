@@ -387,6 +387,51 @@ assertion with no control behind it. The control exists now — the probability 
   of **1.0317**, **105.31** hours at the month's treated volume. Two corrections, opposite signs, nearly
   cancelling: the figure survives for a reason wave 3 did not name.
 
+## And the thing that stopped every model from diverging was the customer leaving
+
+Three waves leaned on the same relief valve without pricing it. Erlang A reaches a steady state
+**because** customers give up; an occupancy ceiling is satisfied by understaffing **because** the
+customers who abandon are what keeps occupancy down; the attrition loop's second regime is reached **by
+losing customers**. Each time the note was that abandonment is the thing the business is trying not to
+do. There was no currency to say how much of it happened, so there is one now.
+
+- **A churn rate is a gauge, and this one reports 6% of what it flags.** Nobody can see a customer
+  leave; an operation sees **silence**. Ten days of it, on 16,195 customers of whom **775** actually
+  left, flags 8,040 people at a sensitivity of **0.6477** and a specificity of **0.5112**. So
+  **93.76% of the customers the dashboard flags did not leave** — and because the Youden index is the
+  exact factor a binary assessor multiplies a difference by, a comparison of two policies on this churn
+  rate reports **15.89%** of the real gap, its index being **0.1589**. Wave 2 found a quality panel transmitting 69.45% and called
+  it an instrument problem. This is the same identity at **a fifth** of that transmission.
+- **And the rule is useless at both ends, for opposite reasons.** The index is not monotone in how often
+  somebody contacts: **0.1008** at one contact, 0.1063 at two, **0.2678** at three, **0.0928** at four
+  or more. At one contact it cannot see the stayers — being silent is what one contact means, so
+  specificity is 0.3368. At four or more it cannot see the leavers — a frequent customer who leaves late
+  still has a recent contact, so sensitivity collapses to 0.2791. **A silence window is a statement
+  about contact frequency before it is a statement about leaving**, and one window for a whole book of
+  customers is two instruments wearing one name.
+- **Losing customers reduces the bill, and the KPI cannot see it.** The policy that drives away the most
+  people books the largest reduction in human hours: `patient` loses **1,123** customers and saves
+  **59.49** hours, against **257** and 24.49 for the human queue — monotone across all four policies,
+  and every one of those hours arrives on the report as efficiency. The ranking by customers lost **is
+  wave 1's containment ranking, exactly**: a fourth ranking of the same four policies, the second that
+  agrees with the KPI while disagreeing with resolution and with time. And containment, recomputed on
+  the contacts that survive, moves by **0.00017** — the numerator and the denominator fall together,
+  which is what a ratio does when you remove the people it is a ratio over. The exchange rate, read out
+  loud: on the containment-maximising policy **one saved hour costs 18.88 customers**.
+- **The valve three waves used, priced in people.** Wave 3's "perfectly stable" six agents at 29.23%
+  abandonment spend **557.74** customers a month; wave 7's eleven agents at 3.56% spend **67.93**. So
+  stability costs **489.81 more customers a month** than compliance, and wave 7's humane-sounding
+  occupancy target pursued alone costs **205.70 more**. Five agents buy that back: **97.96 customers a
+  month per agent.** Which closes what wave 8 left open — it priced an extra agent at 12 person-months
+  against 2.33 returned and said the case rests entirely on what a departure costs *outside* the queue.
+  That is the quantity. There is still no money in this repository, so the price stays with the reader.
+- **And the unit was wrong for nine waves.** Only **590** contacts disappear — 1.86% of the month —
+  because a customer who leaves on day three loses twenty-seven days here and the rest of their life in
+  an operation. Seconds, sessions, agents and hours are monthly quantities, and a month is the window
+  every wave here measured in. Customers are not monthly. **Nine waves built an increasingly careful
+  account in a unit that cannot express the loss at all**, and the only reason it took ten to notice is
+  that the unit was never wrong about anything else.
+
 ## Modules
 
 | Module | What it decides |
@@ -403,6 +448,7 @@ assertion with no control behind it. The control exists now — the probability 
 | [`svclab.chain`](src/svclab/chain/README.md) | What a contact that comes back twice costs, how long a return chain really is and the closed form that says why, and the third ranking of the policies — days to resolution, which no rate contains. |
 | [`svclab.planning`](src/svclab/planning/README.md) | What headcount a set of declared ceilings buys rather than what one target reports, which of the ceilings actually decided it, how that changes with the size of the queue, and how close to breaching the chosen plan sits. |
 | [`svclab.calibration`](src/svclab/calibration/README.md) | Whether the closed form for a routing threshold was given the wrong input or is missing a term, what a threshold fitted on one period costs in the next, and which label a rule a deployment can run has to be keyed on. |
+| [`svclab.churn`](src/svclab/churn/README.md) | What an automation costs in customers rather than in seconds: whether the churn rate an operation can measure is an instrument at all, which policies lose the most people, and what the abandonment three waves used as relief spends. |
 | [`svclab.workforce`](src/svclab/workforce/README.md) | What an occupancy costs in people rather than what a ceiling forbids: the payroll behind an agent count, the exchange rate between occupancy and hiring, and whether the attrition loop it closes ever runs away. |
 
 Every module README is bilingual and carries an **Assumptions and limitations** section, because a
@@ -419,6 +465,7 @@ figure without its assumptions is not a result.
 | [`examples/05_the_frequent_caller.py`](examples/05_the_frequent_caller.py) | The identical contacts regrouped into customers who contact at different rates, with the heavy users correlated with the difficult ones: the shape of the clusters, the design effect that returns, who pays for it, and what it costs the precision of wave 1's estimate. |
 | [`examples/06_the_contact_that_came_back_twice.py`](examples/06_the_contact_that_came_back_twice.py) | The tail five waves truncated, run to its declared end: how many attempts a contact takes, the geometric series that says when that matters, what the chain costs each policy, and the ranking with time in it. |
 | [`examples/07_the_constraint_nobody_declared.py`](examples/07_the_constraint_nobody_declared.py) | The three ceilings declared instead of reported: what each buys on its own, what wave 3's stable queue fails, where the economy of scale stops, and how much room the chosen plan has left. |
+| [`examples/10_the_customer_who_stopped_calling.py`](examples/10_the_customer_who_stopped_calling.py) | The relief valve priced in people: what the month left its customers with, the silence rule measured as a gauge and split by contact frequency, what each policy costs in customers beside what it costs in hours, and the retention an extra agent buys. |
 | [`examples/09_the_threshold_fitted_on_the_answer.py`](examples/09_the_threshold_fitted_on_the_answer.py) | The closed form given the input it assumes and then the term it was missing: the reliability of the score, the four versions of it priced against a sweep, what a threshold costs in a period it never saw, and the rule keyed on the label a router can read. |
 | [`examples/08_the_payroll_behind_the_plan.py`](examples/08_the_payroll_behind_the_plan.py) | The occupancy ceiling priced in people: the payroll each plan actually needs, what a point of occupancy buys in hiring, the queue where there is nothing to trade, and how much steeper the attrition curve would have to be to spiral. |
 
@@ -437,12 +484,13 @@ python examples/06_the_contact_that_came_back_twice.py
 python examples/07_the_constraint_nobody_declared.py
 python examples/08_the_payroll_behind_the_plan.py
 python examples/09_the_threshold_fitted_on_the_answer.py
+python examples/10_the_customer_who_stopped_calling.py
 ```
 
 ## How the claims are kept honest
 
-**433 tests, 100% statement and branch coverage.** 361 of them run in seconds and gate every push. The
-remaining 72 re-derive, from the generator, every figure quoted in every README on this repository,
+**471 tests, 100% statement and branch coverage.** 392 of them run in seconds and gate every push. The
+remaining 79 re-derive, from the generator, every figure quoted in every README on this repository,
 and run the example script. A change that moves a published number breaks the build instead of leaving
 the text quietly wrong.
 
@@ -467,7 +515,7 @@ position depends on how many values are asked for and not on which library versi
 is checked against the source, because a sibling repository published figures that held on one machine
 and moved on a clean install.
 
-**And defects are recorded rather than quietly fixed.** Thirty-eight so far, in
+**And defects are recorded rather than quietly fixed.** Forty so far, in
 [`docs/ROADMAP.md`](docs/ROADMAP.md), every one of them found by connecting the modules, by a control
 case or by verifying a sentence — none by reading code. Two are worth reading. The original session
 charged a repeat contact as extra seconds rather than as a row, which makes deflection arithmetically
