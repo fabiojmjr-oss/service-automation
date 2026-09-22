@@ -299,6 +299,43 @@ headcount que satisfaz todos eles, e **diga qual deles decidiu**.
   plano que reporta "todas as restrições atendidas" e um que reporta as margens são o mesmo plano, e só
   o segundo diz qual número se move primeiro quando alguém falta.
 
+## E todo headcount acima era uma contagem de atendentes, não uma folha de pagamento
+
+A onda 7 declarou a ocupação um **teto**: 0,84 ok, 0,86 proibido. O que um teto substitui é uma
+**curva** — a rotatividade cresce com o quanto o trabalho é duro — e uma curva transforma restrição em
+preço. Precificá-la fecha um laço que todo gestor de operações conhece e nenhum modelo de
+dimensionamento contém: **a ocupação eleva a rotatividade → a rotatividade esvazia cadeiras → uma
+cadeira vazia não é um atendente → menos atendentes elevam a ocupação.** Então o quadro que produz o
+trabalho e o quadro na folha são dois números unidos por um ponto fixo, não por uma margem.
+
+- **Os onze atendentes da onda 7 custam doze pessoas, e a cem erlangs 119 atendentes custam 130** — com
+  **7,13 cadeiras vazias** e **9,51 pessoas em ramp** em qualquer instante. O prêmio não é um colchão
+  que alguém escolheu; é a solução do laço. E ele **não é monótono no tamanho da fila** — 1,3333 a um
+  erlang, 1,0800 a vinte, 1,1017 a cinquenta — porque a aritmética inteira domina a fila pequena e a
+  rotatividade domina a grande.
+- **O que precifica a eficiência que a onda 7 celebrou.** A fila grande que precisava de apenas 1,18
+  atendentes por erlang roda a 0,84 de ocupação, perde **36,1% do quadro por ano** e contrata **57
+  pessoas por ano para ficar parada**. Um case de consolidação que conta os atendentes economizados e
+  não o recrutamento que assume contou um lado só.
+- **A taxa de câmbio é 1,01: vinte e sete pessoas a mais na folha compram 27,39 contratações a menos por
+  ano.** É o número que um gestor pede e que um modelo de dimensionamento nunca imprime — e, como este
+  repositório não tem dinheiro dentro, a taxa pode ser lida na moeda dele mesmo. Uma saída desperdiça
+  2,30 pessoa-meses, então um atendente extra custa **12 pessoa-meses por ano** e devolve **2,33**:
+  razão de **0,19**. **Nos livros da própria fila, afrouxar a ocupação perde por um fator de cinco** — o
+  que não a torna errada: significa que o caso repousa inteiramente sobre o que uma saída custa *fora*
+  da fila, e nomear esse número que falta é a entrega.
+- **Na fila da onda 1 não há troca alguma.** Todo teto de 0,90 a 0,70 exige as mesmas doze pessoas,
+  porque o nível de serviço já entrega 0,6411 de ocupação — abaixo do joelho, onde a rotatividade está
+  no piso. A taxa volta como `nan` e não zero: zero diria que a troca é grátis. **O problema
+  ocupação-rotatividade é um problema de fila grande**, a mesma fronteira que a onda 7 encontrou.
+- **E o laço não escapa.** Na curva declarada o ponto fixo é único e a iteração o alcança dos dois
+  extremos; a inclinação precisa ser **12,5 vezes mais forte** para a folha do plano colapsar. Duas
+  pessoas abaixo do plano, ela se divide a **cinco vezes** — então **robustez é propriedade da folha,
+  não só da curva**, o que é um segundo argumento, independente, para financiar o plano. E onde existem
+  dois regimes, o alcançado a partir da crise tem ocupação *menor* e rotatividade *menor*: o abandono é
+  a válvula de escape. **É a terceira vez neste repositório que o abandono é o que impede algo de
+  divergir** — e é a coisa que o negócio está tentando não fazer.
+
 ## Módulos
 
 | Módulo | O que decide |
@@ -314,6 +351,7 @@ headcount que satisfaz todos eles, e **diga qual deles decidiu**.
 | [`svclab.concentration`](src/svclab/concentration/README.md) | O que o agrupamento decide quando os clientes não contatam todos igualmente: quão desiguais os grupos realmente são, qual dos dois tamanhos de grupo entra num efeito de desenho, quem paga pelas falhas, e quanta precisão uma estimativa por cliente perde. |
 | [`svclab.chain`](src/svclab/chain/README.md) | O que custa um contato que volta duas vezes, quão longa é de fato uma cadeia de retornos e a forma fechada que diz por quê, e o terceiro ranking das políticas — dias até resolver, que nenhuma taxa contém. |
 | [`svclab.planning`](src/svclab/planning/README.md) | Que headcount um conjunto de tetos declarados compra em vez do que uma meta única reporta, qual dos tetos de fato decidiu, como isso muda com o tamanho da fila, e a que distância de furar o plano escolhido está. |
+| [`svclab.workforce`](src/svclab/workforce/README.md) | O que uma ocupação custa em pessoas em vez do que um teto proíbe: a folha atrás de uma contagem de atendentes, a taxa de câmbio entre ocupação e contratação, e se o laço de rotatividade que ela fecha alguma vez escapa. |
 
 Todo README de módulo é bilíngue e traz uma seção **Premissas e limitações**, porque uma cifra sem suas
 premissas não é um resultado.
@@ -329,6 +367,7 @@ premissas não é um resultado.
 | [`examples/05_the_frequent_caller.py`](examples/05_the_frequent_caller.py) | Os mesmos contatos reagrupados em clientes que contatam em taxas diferentes, com os pesados correlacionados aos difíceis: a forma dos grupos, o efeito de desenho que retorna, quem paga por ele, e o que custa à precisão da estimativa da onda 1. |
 | [`examples/06_the_contact_that_came_back_twice.py`](examples/06_the_contact_that_came_back_twice.py) | A cauda que cinco ondas truncaram, rodada até seu fim declarado: quantas tentativas um contato leva, a série geométrica que diz quando isso importa, o que a cadeia custa a cada política, e o ranking que tem tempo dentro. |
 | [`examples/07_the_constraint_nobody_declared.py`](examples/07_the_constraint_nobody_declared.py) | Os três tetos declarados em vez de reportados: o que cada um compra sozinho, no que a fila estável da onda 3 falha, onde a economia de escala para, e quanto espaço sobra no plano escolhido. |
+| [`examples/08_the_payroll_behind_the_plan.py`](examples/08_the_payroll_behind_the_plan.py) | O teto de ocupação precificado em pessoas: a folha que cada plano de fato exige, o que um ponto de ocupação compra em contratação, a fila onde não há o que trocar, e quão mais forte a curva de rotatividade teria de ser para espiralar. |
 
 ## Instalar e rodar
 
@@ -343,12 +382,13 @@ python examples/04_the_customer_who_was_a_label.py
 python examples/05_the_frequent_caller.py
 python examples/06_the_contact_that_came_back_twice.py
 python examples/07_the_constraint_nobody_declared.py
+python examples/08_the_payroll_behind_the_plan.py
 ```
 
 ## Como as afirmações são mantidas honestas
 
-**338 testes, 100% de cobertura de linhas e de ramos.** 280 deles rodam em segundos e liberam cada push.
-Os 58 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
+**371 testes, 100% de cobertura de linhas e de ramos.** 307 deles rodam em segundos e liberam cada push.
+Os 64 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
 rodam o script de exemplo. Uma mudança que mova um número publicado quebra o build em vez de deixar o
 texto silenciosamente errado.
 
@@ -373,7 +413,7 @@ modo que a posição no stream depende de quantos valores são pedidos e não de
 responde. Essa regra é verificada contra o código-fonte, porque um repositório irmão publicou cifras
 que valiam numa máquina e mudavam numa instalação limpa.
 
-**E defeitos são registrados em vez de corrigidos em silêncio.** Trinta e três até aqui, em
+**E defeitos são registrados em vez de corrigidos em silêncio.** Trinta e quatro até aqui, em
 [`docs/ROADMAP.md`](docs/ROADMAP.md), cada um deles achado conectando os módulos, por um caso de
 controle ou verificando uma frase — nenhum lendo código. Dois valem a leitura. A sessão original cobrava
 um recontato como segundos extras em vez de como uma linha, o que torna o desvio aritmeticamente

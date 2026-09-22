@@ -443,3 +443,48 @@ SINGLE_RETURN = ChainProfile(max_attempts=2, return_decay=1.0, human_retry_lift=
 #: and a human who is 15% more likely to resolve it each time - the two effects that make a real
 #: chain terminate, pulling in opposite directions on the same contact.
 CHAIN = ChainProfile(max_attempts=4, return_decay=0.85, human_retry_lift=1.15)
+
+
+@dataclass(frozen=True)
+class WorkforceProfile:
+    """What an occupancy costs in people, rather than what a ceiling forbids.
+
+    Wave 7 treated occupancy as a ceiling: 0.84 was fine and 0.86 was forbidden. What it stood in
+    for is a curve - attrition rises with how hard the work is - and a curve turns a constraint into
+    a price. The chain it prices is one every manager knows and no staffing model contains:
+
+    **Occupancy drives attrition, attrition empties seats, an empty seat is not an agent, and fewer
+    agents raise occupancy.** That is a loop, so the headcount that produces the work and the
+    headcount on the payroll are two numbers joined by a fixed point rather than by a margin.
+
+    Attributes:
+        base_attrition: Monthly share of agents who leave when the work is easy. 0.02 a month is
+            about 21.5% a year.
+        attrition_knee: The occupancy below which attrition is flat. Work does not become unpleasant
+            gradually from zero.
+        attrition_slope: Extra monthly attrition per point of occupancy above the knee. 0.12 takes
+            0.02 to 0.038 a month at 0.85 occupancy, which is about 37% a year.
+        time_to_fill_months: Months a seat stays empty after somebody leaves.
+        ramp_months: Months a new agent takes to reach full productivity.
+        ramp_productivity: What a new agent produces during that time, as a share of a full agent.
+    """
+
+    base_attrition: float
+    attrition_knee: float
+    attrition_slope: float
+    time_to_fill_months: float
+    ramp_months: float
+    ramp_productivity: float
+
+
+#: Declared, not benchmarked. The slope is the number the whole wave turns on and it is deliberately
+#: moderate: a steeper one produces two equilibria, and wave 8 measures how much steeper it has to
+#: be rather than assuming the dramatic case.
+WORKFORCE = WorkforceProfile(
+    base_attrition=0.02,
+    attrition_knee=0.70,
+    attrition_slope=0.12,
+    time_to_fill_months=1.5,
+    ramp_months=2.0,
+    ramp_productivity=0.60,
+)

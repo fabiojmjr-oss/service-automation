@@ -467,6 +467,59 @@ promise into an internal limit, and those are negotiated with different people.
    until the test that walks the whole search range existed. The habit worth keeping is not the test -
    it is asking what a search silently assumes before trusting what it returns.
 
+## Wave 8 — the payroll behind the plan *(complete)*
+
+Wave 7 declared occupancy a ceiling. What a ceiling stands in for is a curve, and a curve turns a
+constraint into a price. This wave prices it, which closes a loop none of the earlier waves contained:
+occupancy raises attrition, attrition empties seats, an empty seat is not an agent, fewer agents raise
+occupancy.
+
+| Delivered | Where |
+| --- | --- |
+| An attrition curve with a declared base, knee and slope | `synth.WorkforceProfile`, `synth.WORKFORCE` |
+| The producing share of a payroll: the vacancies and the ramp the attrition implies | `workforce.available_share` |
+| The fixed point of the loop, iterated from a declared starting occupancy | `workforce.settle` |
+| The death spiral reported as a **state** rather than raised as an error | `Settlement.collapsed` |
+| The smallest payroll whose settled state satisfies wave 7's ceilings | `workforce.staffed_for_constraints` |
+| The payroll behind each of wave 7's plans, with its empty and ramping seats | `workforce.payroll_table` |
+| What a point of occupancy costs in people and buys in hires | `workforce.trade_table`, `workforce.exchange_rate` |
+| Whether the loop has one resting place or two, across a range of slopes | `workforce.regime_table` |
+
+**The thread from wave 7.** Wave 7 said the occupancy ceiling binds on large queues and left the ceiling
+as a rule. Wave 8 prices it: twenty-seven more people on a hundred-erlang payroll buys 27.39 fewer hires
+a year, an exchange rate of 1.01. And because this repository has no money in it, the rate reads in its
+own currency - a departure wastes 2.30 person-months, so an extra agent costs 12 person-months a year
+and returns 2.33, a ratio of 0.19. **On the queue's own books, loosening the occupancy loses by a factor
+of five.** That is not an argument against doing it. It is a precise statement of the number a plan is
+implicitly asserting when it does, and the repository declines to invent that number rather than hiding
+the gap.
+
+The result I did not expect is Result 3. I built the loop expecting a death spiral and the declared curve
+does not have one: the fixed point is unique and the iteration reaches it from either end. The slope has
+to be **12.5 times steeper** before the plan's payroll can collapse - and two people short of the plan,
+only **five times**. So robustness to the spiral is a property of the **payroll**, not only of the
+curve, which is a second and independent argument for funding a plan and one no queueing model makes.
+
+The second thing I did not expect is what the second regime looks like where it exists. It is not a
+collapse: it has *lower* occupancy and *lower* attrition than the healthy one, reached by losing
+customers rather than by keeping agents, with the identical 21.0% abandonment. **Abandonment is the
+escape valve, for the third time in this repository** - wave 3's Erlang A has a steady state exactly
+where Erlang C has none because people leave; wave 7's occupancy ceiling on its own is satisfied by
+understaffing because the customers who abandon keep occupancy down; wave 8's attrition loop finds its
+second resting place the same way. Every model in this family is stabilised by the thing the business is
+trying not to do, and noticing that three times is what made it worth writing down.
+
+### Defects found and recorded
+
+1. **A trade table whose exchange rate could not exist, and reporting zero would have hidden it.** On
+   wave 1's 7.58-erlang queue every occupancy ceiling from 0.90 to 0.70 needs the same twelve people,
+   because the service level already delivers 0.6411 occupancy - below the attrition curve's knee. The
+   first version divided by a payroll change of zero and the test caught a rate of `nan` I had not
+   planned for. Keeping the `nan` is the fix: zero would say the trade is free, and the truth is that
+   **there is no trade to make**. Now stated in the function, tested as a property, and published as
+   the boundary it is - the occupancy-attrition problem is a large-queue problem, the same boundary
+   wave 7 found for its binding ceiling.
+
 ## What is deliberately not here
 
 - **No language model, and no API call to one.** The bot is a policy plus a declared response curve.
@@ -489,10 +542,16 @@ promise into an internal limit, and those are negotiated with different people.
 
 ## Still open
 
-- **Attrition as a curve rather than a ceiling.** Wave 7 treats 0.84 occupancy as fine and 0.86 as
-  forbidden, when the truth is a rising hazard. Putting attrition in would make occupancy an optimum
-  instead of a constraint, which is a different and better model - and the one that would let a plan
-  trade a point of occupancy against a month of recruitment.
+- **Attrition that depends on more than occupancy.** Wave 8's curve knows about how hard the work is
+  and nothing else. Pay, management, commute, the labour market and the season all matter more in most
+  operations, and a curve fitted to one operation's leavers is the first thing worth measuring before
+  any of wave 8's arithmetic is trusted.
+- **The transition rather than the steady state.** Every figure in wave 8 is a fixed point, which
+  assumes the load, the curve and the hiring pipeline have been stable long enough to settle. The pain
+  of a spiral lives in the months on the way there, and nothing here models them.
+- **A hiring pipeline that can fail.** A departure is replaced immediately and always. No freeze, no
+  role that cannot be filled, no candidate queue that empties - and each of those makes the payroll
+  premium worse than the numbers published here.
 - **A plan per interval, and shrinkage.** Every headcount in wave 7 staffs one steady state. A real
   plan solves each half hour and then loses agents to breaks, training and absence, which multiplies
   every figure here without changing any of the arguments.

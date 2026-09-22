@@ -77,9 +77,17 @@ from svclab.synth import (
     QUALITY,
     ROUTING,
     SINGLE_RETURN,
+    WORKFORCE,
     Dataset,
     concentrated_dataset,
     correlated_dataset,
+)
+from svclab.workforce import (
+    exchange_rate,
+    payroll_table,
+    regime_table,
+    staffed_for_constraints,
+    trade_table,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -902,6 +910,124 @@ def test_the_headroom_at_the_chosen_headcount_is_what_is_published() -> None:
         key=lambda item: item[1],
     )
     assert thinnest[0] == "abandonment"
+
+
+# --- svclab.workforce ---------------------------------------------------------------------------
+
+#: The queue wave 8 prices its ladder on: big enough for the occupancy ceiling to bind.
+BIG_LOAD = 100.0
+
+
+def test_the_payroll_behind_each_plan_is_what_is_published() -> None:
+    published = {
+        1.0: (3, 4, 1.3333, 0.2532, 0.0200, 0.2153, 0.96, 0.12, 0.16),
+        7.5845: (11, 12, 1.0909, 0.6411, 0.0200, 0.2153, 2.88, 0.36, 0.48),
+        20.0: (25, 27, 1.0800, 0.7753, 0.0290, 0.2979, 9.41, 1.18, 1.57),
+        50.0: (59, 65, 1.1017, 0.8283, 0.0354, 0.3511, 27.61, 3.45, 4.60),
+        100.0: (119, 130, 1.0924, 0.8382, 0.0366, 0.3606, 57.07, 7.13, 9.51),
+    }
+    table = payroll_table(tuple(published), PLAN_HANDLING, PLAN_PATIENCE, EVERY_CEILING).set_index(
+        "load"
+    )
+    for load, figures in published.items():
+        agents, staffed, premium, busy, monthly, annual, hires, empty, ramping = figures
+        row = table.loc[load]
+        assert int(row["effective_agents"]) == agents, load
+        assert int(row["staffed"]) == staffed, load
+        assert float(row["payroll_premium"]) == pytest.approx(premium, abs=5e-5), load
+        assert float(row["occupancy"]) == pytest.approx(busy, abs=5e-5), load
+        assert float(row["monthly_attrition"]) == pytest.approx(monthly, abs=5e-5), load
+        assert float(row["annual_attrition"]) == pytest.approx(annual, abs=5e-5), load
+        assert float(row["hires_per_year"]) == pytest.approx(hires, abs=5e-3), load
+        assert float(row["empty_seats"]) == pytest.approx(empty, abs=5e-3), load
+        assert float(row["ramping_seats"]) == pytest.approx(ramping, abs=5e-3), load
+    # The premium is not monotone in the size of the queue, which is a claim about the shape.
+    premiums = table["payroll_premium"].tolist()
+    assert premiums != sorted(premiums)
+    assert premiums != sorted(premiums, reverse=True)
+
+
+def test_wave_sevens_eleven_agents_cost_twelve_people() -> None:
+    settled = staffed_for_constraints(PLAN_LOAD, PLAN_HANDLING, PLAN_PATIENCE, EVERY_CEILING)
+    assert settled.staffed == 12
+    assert math.floor(settled.effective_agents) == 11
+    assert (
+        settled.staffed
+        == agents_for_constraints(PLAN_LOAD, PLAN_HANDLING, PLAN_PATIENCE, EVERY_CEILING) + 1
+    )
+
+
+def test_the_occupancy_ladder_and_its_exchange_rate_are_what_is_published() -> None:
+    published = {
+        0.90: (123, 110, 0.8912, 0.0429, 0.4095, 63.39),
+        0.85: (130, 119, 0.8382, 0.0366, 0.3606, 57.07),
+        0.80: (135, 125, 0.7990, 0.0319, 0.3221, 51.64),
+        0.75: (143, 134, 0.7420, 0.0250, 0.2624, 42.97),
+        0.70: (150, 143, 0.6988, 0.0200, 0.2153, 36.00),
+    }
+    table = trade_table(
+        tuple(published), BIG_LOAD, PLAN_HANDLING, PLAN_PATIENCE, EVERY_CEILING
+    ).set_index("max_occupancy")
+    for ceiling, figures in published.items():
+        staffed, agents, busy, monthly, annual, hires = figures
+        row = table.loc[ceiling]
+        assert int(row["staffed"]) == staffed, ceiling
+        assert int(row["effective_agents"]) == agents, ceiling
+        assert float(row["occupancy"]) == pytest.approx(busy, abs=5e-5), ceiling
+        assert float(row["monthly_attrition"]) == pytest.approx(monthly, abs=5e-5), ceiling
+        assert float(row["annual_attrition"]) == pytest.approx(annual, abs=5e-5), ceiling
+        assert float(row["hires_per_year"]) == pytest.approx(hires, abs=5e-3), ceiling
+    rate = exchange_rate(table.reset_index())
+    assert rate["extra_staffed"] == pytest.approx(27.0)
+    assert rate["fewer_hires_per_year"] == pytest.approx(27.39, abs=5e-3)
+    assert rate["hires_per_agent"] == pytest.approx(1.01, abs=5e-3)
+    # And the reading in the repository's own currency, which is the paragraph under the table.
+    wasted = WORKFORCE.time_to_fill_months + WORKFORCE.ramp_months * (
+        1.0 - WORKFORCE.ramp_productivity
+    )
+    assert wasted == pytest.approx(2.30, abs=5e-3)
+    assert rate["hires_per_agent"] * wasted == pytest.approx(2.33, abs=5e-3)
+    assert rate["hires_per_agent"] * wasted / 12.0 == pytest.approx(0.19, abs=5e-3)
+
+
+def test_the_small_queue_has_no_trade_to_make() -> None:
+    table = trade_table(
+        (0.90, 0.85, 0.80, 0.75, 0.70), PLAN_LOAD, PLAN_HANDLING, PLAN_PATIENCE, EVERY_CEILING
+    )
+    assert (table["staffed"] == table["staffed"].iloc[0]).all()
+    assert int(table["staffed"].iloc[0]) == 12
+    assert float(table["occupancy"].iloc[0]) == pytest.approx(0.6411, abs=5e-5)
+    assert math.isnan(exchange_rate(table)["hires_per_agent"])
+
+
+def test_where_the_attrition_loop_splits_is_what_is_published() -> None:
+    planned = regime_table(
+        (0.12, 0.60, 1.00, 1.50), 12, PLAN_LOAD, PLAN_HANDLING, PLAN_PATIENCE
+    ).set_index("attrition_slope")
+    for slope in (0.12, 0.60, 1.00):
+        assert not bool(planned.loc[slope, "two_regimes"]), slope
+        assert float(planned.loc[slope, "from_calm_occupancy"]) == pytest.approx(0.6411, abs=5e-5)
+    assert bool(planned.loc[1.50, "two_regimes"])
+    assert bool(planned.loc[1.50, "from_crisis_collapsed"])
+    assert 1.50 / WORKFORCE.attrition_slope == pytest.approx(12.5, abs=5e-2)
+
+    short = regime_table(
+        (0.12, 0.60, 1.00, 1.50), 10, PLAN_LOAD, PLAN_HANDLING, PLAN_PATIENCE
+    ).set_index("attrition_slope")
+    assert not bool(short.loc[0.12, "two_regimes"])
+    assert bool(short.loc[0.60, "two_regimes"])
+    assert 0.60 / WORKFORCE.attrition_slope == pytest.approx(5.0, abs=5e-2)
+    # The second regime is not a collapse: it has lower occupancy and lower attrition.
+    row = short.loc[1.00]
+    assert float(row["from_calm_occupancy"]) == pytest.approx(0.8088, abs=5e-5)
+    assert float(row["from_crisis_occupancy"]) == pytest.approx(0.7551, abs=5e-5)
+    assert float(row["from_calm_attrition"]) == pytest.approx(0.1288, abs=5e-5)
+    assert float(row["from_crisis_attrition"]) == pytest.approx(0.0751, abs=5e-5)
+    assert float(row["from_calm_attrition"]) / float(row["from_crisis_attrition"]) == (
+        pytest.approx(1.71, abs=5e-3)
+    )
+    assert float(row["from_calm_abandonment"]) == pytest.approx(0.2100, abs=5e-5)
+    assert float(row["from_crisis_abandonment"]) == pytest.approx(0.2100, abs=5e-5)
 
 
 # --- The example -------------------------------------------------------------------------------

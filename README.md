@@ -298,6 +298,43 @@ satisfies all of them, and **say which one decided it**.
   thinnest of the three. A plan that reports "all constraints met" and one that reports the margins
   are the same plan, and only the second says which number moves first when somebody calls in sick.
 
+## And every headcount above was an agent count, not a payroll
+
+Wave 7 declared occupancy a **ceiling**: 0.84 fine, 0.86 forbidden. What a ceiling stands in for is a
+**curve** — attrition rises with how hard the work is — and a curve turns a constraint into a price.
+Pricing it closes a loop every operations manager knows and no staffing model contains: **occupancy
+raises attrition → attrition empties seats → an empty seat is not an agent → fewer agents raise
+occupancy.** So the headcount that produces the work and the headcount on the payroll are two numbers
+joined by a fixed point rather than by a margin.
+
+- **Wave 7's eleven agents cost twelve people, and at a hundred erlangs 119 agents cost 130** — with
+  **7.13 seats empty** and **9.51 people ramping** at any moment. The premium is not a buffer somebody
+  chose; it is the solution of the loop. And it is **not monotone in the size of the queue** — 1.3333 at
+  one erlang, 1.0800 at twenty, 1.1017 at fifty — because integer arithmetic dominates a small queue and
+  attrition dominates a large one.
+- **Which prices the efficiency wave 7 celebrated.** The large queue that needed only 1.18 agents per
+  erlang runs at 0.84 occupancy, loses **36.1% of its staff a year** and hires **57 people a year to
+  stand still**. A consolidation case that counts the agents saved and not the recruiting it commits to
+  has counted one side.
+- **The exchange rate is 1.01: twenty-seven more people on the payroll buys 27.39 fewer hires a year.**
+  That is the number a manager asks for and a staffing model never prints — and because this repository
+  has no money in it, the rate can be read in its own currency. A departure wastes 2.30 person-months,
+  so an extra agent costs **12 person-months a year** and returns **2.33**: a ratio of **0.19**. **On
+  the queue's own books, loosening the occupancy loses by a factor of five** — which does not make it
+  wrong, it means the case rests entirely on what a departure costs *outside* the queue, and naming
+  that missing number is the deliverable.
+- **On wave 1's queue there is no trade at all.** Every ceiling from 0.90 down to 0.70 needs the same
+  twelve people, because the service level already delivers 0.6411 occupancy — under the knee, where
+  attrition sits at its floor. The rate comes back `nan` rather than zero: zero would say the trade was
+  free. **The occupancy-attrition problem is a large-queue problem**, the same boundary wave 7 found.
+- **And the loop does not run away.** At the declared curve the fixed point is unique and the iteration
+  reaches it from either end; the slope has to be **12.5 times steeper** before the plan's payroll can
+  collapse. Two people short of the plan it splits at **five times** — so **robustness is a property of
+  the payroll, not only of the curve**, which is a second and independent argument for funding the plan.
+  And where two regimes exist, the one reached from crisis has *lower* occupancy and *lower* attrition:
+  the abandonment is the escape valve. **That is the third time in this repository that abandonment is
+  what stops something from diverging**, and it is the thing the business is trying not to do.
+
 ## Modules
 
 | Module | What it decides |
@@ -313,6 +350,7 @@ satisfies all of them, and **say which one decided it**.
 | [`svclab.concentration`](src/svclab/concentration/README.md) | What grouping decides once customers do not all contact equally often: how unequal the clusters really are, which of the two cluster sizes belongs in a design effect, who pays for the failures, and how much precision a per-customer estimate loses. |
 | [`svclab.chain`](src/svclab/chain/README.md) | What a contact that comes back twice costs, how long a return chain really is and the closed form that says why, and the third ranking of the policies — days to resolution, which no rate contains. |
 | [`svclab.planning`](src/svclab/planning/README.md) | What headcount a set of declared ceilings buys rather than what one target reports, which of the ceilings actually decided it, how that changes with the size of the queue, and how close to breaching the chosen plan sits. |
+| [`svclab.workforce`](src/svclab/workforce/README.md) | What an occupancy costs in people rather than what a ceiling forbids: the payroll behind an agent count, the exchange rate between occupancy and hiring, and whether the attrition loop it closes ever runs away. |
 
 Every module README is bilingual and carries an **Assumptions and limitations** section, because a
 figure without its assumptions is not a result.
@@ -328,6 +366,7 @@ figure without its assumptions is not a result.
 | [`examples/05_the_frequent_caller.py`](examples/05_the_frequent_caller.py) | The identical contacts regrouped into customers who contact at different rates, with the heavy users correlated with the difficult ones: the shape of the clusters, the design effect that returns, who pays for it, and what it costs the precision of wave 1's estimate. |
 | [`examples/06_the_contact_that_came_back_twice.py`](examples/06_the_contact_that_came_back_twice.py) | The tail five waves truncated, run to its declared end: how many attempts a contact takes, the geometric series that says when that matters, what the chain costs each policy, and the ranking with time in it. |
 | [`examples/07_the_constraint_nobody_declared.py`](examples/07_the_constraint_nobody_declared.py) | The three ceilings declared instead of reported: what each buys on its own, what wave 3's stable queue fails, where the economy of scale stops, and how much room the chosen plan has left. |
+| [`examples/08_the_payroll_behind_the_plan.py`](examples/08_the_payroll_behind_the_plan.py) | The occupancy ceiling priced in people: the payroll each plan actually needs, what a point of occupancy buys in hiring, the queue where there is nothing to trade, and how much steeper the attrition curve would have to be to spiral. |
 
 ## Install and run
 
@@ -342,12 +381,13 @@ python examples/04_the_customer_who_was_a_label.py
 python examples/05_the_frequent_caller.py
 python examples/06_the_contact_that_came_back_twice.py
 python examples/07_the_constraint_nobody_declared.py
+python examples/08_the_payroll_behind_the_plan.py
 ```
 
 ## How the claims are kept honest
 
-**338 tests, 100% statement and branch coverage.** 280 of them run in seconds and gate every push. The
-remaining 58 re-derive, from the generator, every figure quoted in every README on this repository,
+**371 tests, 100% statement and branch coverage.** 307 of them run in seconds and gate every push. The
+remaining 64 re-derive, from the generator, every figure quoted in every README on this repository,
 and run the example script. A change that moves a published number breaks the build instead of leaving
 the text quietly wrong.
 
@@ -372,7 +412,7 @@ position depends on how many values are asked for and not on which library versi
 is checked against the source, because a sibling repository published figures that held on one machine
 and moved on a clean install.
 
-**And defects are recorded rather than quietly fixed.** Thirty-three so far, in
+**And defects are recorded rather than quietly fixed.** Thirty-four so far, in
 [`docs/ROADMAP.md`](docs/ROADMAP.md), every one of them found by connecting the modules, by a control
 case or by verifying a sentence — none by reading code. Two are worth reading. The original session
 charged a repeat contact as extra seconds rather than as a row, which makes deflection arithmetically

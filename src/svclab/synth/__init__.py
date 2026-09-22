@@ -23,6 +23,7 @@ from .config import (
     ROUTING,
     SEED,
     SINGLE_RETURN,
+    WORKFORCE,
     CentreProfile,
     ChainProfile,
     ConcentrationProfile,
@@ -31,6 +32,7 @@ from .config import (
     PopulationProfile,
     QualityProfile,
     RoutingProfile,
+    WorkforceProfile,
 )
 from .contacts import (
     CONTACT_COLUMNS,
@@ -66,6 +68,7 @@ __all__ = [
     "ROUTING_SCORE_COLUMNS",
     "SEED",
     "SINGLE_RETURN",
+    "WORKFORCE",
     "TRUTH_DRAW_COLUMNS",
     "CentreProfile",
     "ChainProfile",
@@ -76,6 +79,7 @@ __all__ = [
     "PopulationProfile",
     "QualityProfile",
     "RoutingProfile",
+    "WorkforceProfile",
     "accuracy_curve",
     "blend",
     "concentrated_dataset",
