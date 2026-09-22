@@ -73,6 +73,49 @@ def _accuracy(difficulty: np.ndarray, which: np.ndarray) -> np.ndarray:
     return np.clip(ceilings - slopes * difficulty, 0.0, 1.0)
 
 
+#: Columns of what the classifier reported, which is the only part of its work a deployment sees.
+LABEL_COLUMNS = ("contact", "classified_correctly", "predicted_intent")
+
+
+def classifier_labels(contacts: pd.DataFrame) -> pd.DataFrame:
+    """What the classifier said about each contact, before any routing decision is taken.
+
+    :func:`run` computed this inline until wave 9 needed it on its own. A routing rule keyed on the
+    predicted intent has to fire on a label the classifier reported, and a rule that had to run the
+    bot to discover that label would be a rule no deployment could implement. Nothing here reads the
+    policy or the ``defer`` column, so the answer is the same whatever the router decides - which is
+    what makes it available *before* the decision.
+
+    The correctness column is truth about the classifier rather than about the contact: it is what a
+    calibration study has as its target, and an operation gets it by labelling a sample by hand.
+
+    Args:
+        contacts: The contact table.
+
+    Returns:
+        A frame with the columns in :data:`LABEL_COLUMNS`, one row per contact.
+
+    Raises:
+        KeyError: If the contact table is missing a column the label is built from.
+    """
+    missing = {"contact", "intent", "difficulty", "classifier_draw"} - set(contacts.columns)
+    if missing:
+        raise KeyError(f"the contact table is missing {sorted(missing)}")
+    labels = np.array([profile.intent for profile in INTENTS])
+    confused = np.array([profile.confused_with for profile in INTENTS])
+    index = {profile.intent: position for position, profile in enumerate(INTENTS)}
+    which = np.array([index[value] for value in contacts["intent"]], dtype=int)
+    difficulty = contacts["difficulty"].to_numpy(dtype=float)
+    correct = contacts["classifier_draw"].to_numpy(dtype=float) < _accuracy(difficulty, which)
+    return pd.DataFrame(
+        {
+            "contact": contacts["contact"].to_numpy(),
+            "classified_correctly": correct,
+            "predicted_intent": np.where(correct, labels[which], confused[which]),
+        }
+    )[list(LABEL_COLUMNS)]
+
+
 def _turns_needed(difficulty: np.ndarray) -> np.ndarray:
     """Bot turns a resolvable contact takes, rising with difficulty."""
     span = TURNS_AT_HARDEST - TURNS_AT_EASIEST
@@ -167,14 +210,13 @@ def run(
     if missing:
         raise KeyError(f"the contact table is missing {sorted(missing)}")
 
-    labels = np.array([profile.intent for profile in INTENTS])
-    confused = np.array([profile.confused_with for profile in INTENTS])
     index = {profile.intent: position for position, profile in enumerate(INTENTS)}
     which = np.array([index[value] for value in contacts["intent"]], dtype=int)
-
     difficulty = contacts["difficulty"].to_numpy(dtype=float)
-    correct = contacts["classifier_draw"].to_numpy(dtype=float) < _accuracy(difficulty, which)
-    predicted = np.where(correct, labels[which], confused[which])
+
+    reported = classifier_labels(contacts)
+    correct = reported["classified_correctly"].to_numpy(dtype=bool)
+    predicted = reported["predicted_intent"].to_numpy()
 
     refused = np.array([value in policy.straight_to_human for value in predicted])
     holdout = contacts["holdout"].to_numpy(dtype=bool)

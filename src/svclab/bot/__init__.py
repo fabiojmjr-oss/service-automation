@@ -10,17 +10,20 @@ policies meet the same contacts and any difference between them is the policy.
 
 from .policy import GUARDED, HUMAN_ONLY, PATIENT, POLICIES, THREE_TURNS, BotPolicy
 from .session import (
+    LABEL_COLUMNS,
     OUTCOME_COLUMNS,
     OUTCOMES,
     REPEAT_SESSION_OFFSET,
     TURNS_AT_EASIEST,
     TURNS_AT_HARDEST,
+    classifier_labels,
     run,
 )
 
 __all__ = [
     "GUARDED",
     "HUMAN_ONLY",
+    "LABEL_COLUMNS",
     "OUTCOMES",
     "OUTCOME_COLUMNS",
     "PATIENT",
@@ -30,5 +33,6 @@ __all__ = [
     "TURNS_AT_EASIEST",
     "TURNS_AT_HARDEST",
     "BotPolicy",
+    "classifier_labels",
     "run",
 ]

@@ -1,16 +1,16 @@
-# Oito achados, para quem assina o business case
+# Nove achados, para quem assina o business case
 
 *[English](FINDINGS.md)*
 
 O [README raiz](../README.pt-BR.md) apresenta cada achado ao lado da aritmética que o produziu. Este
-documento faz o outro trabalho: diz, para cada um dos oito, **em que decisão o achado desemboca, o que
+documento faz o outro trabalho: diz, para cada um dos nove, **em que decisão o achado desemboca, o que
 uma operação competente teria decidido sem ele, e o que fazer em vez disso.** Nenhuma cifra nova aparece
 aqui. Todo número abaixo está citado do README, que por sua vez está sob teste — uma cifra que se moveu
 quebra o build antes de chegar a esta página.
 
 Um aviso antes da lista. Estes são achados sobre **uma conta sintética declarada**, gerada pelo
 `svclab.synth` a partir de parâmetros escritos. Não são estatísticas de mercado e não são benchmark. O
-que se transfere é o **método** — e, em quatro dos oito casos, uma **forma fechada** que vale em qualquer
+que se transfere é o **método** — e, em cinco dos nove casos, uma **forma fechada** que vale em qualquer
 conta, não só nesta.
 
 | # | A decisão em que desemboca | A cifra que decide |
@@ -23,6 +23,7 @@ conta, não só nesta.
 | 6 | Quanto custa um contato não resolvido depois de hoje | A cauda é 1,0448 sessões, e a alavanca não é o cliente |
 | 7 | Qual restrição decidiu o headcount | Teto de ocupação sozinho é satisfeito por subdimensionamento |
 | 8 | A diferença entre contagem de atendentes e folha | Onze atendentes custam doze pessoas, por ponto fixo |
+| 9 | Se corrigir o insumo de um modelo ou o modelo | A fórmula erra 7,33% num score perfeitamente calibrado |
 
 ## 1. O KPI ranqueia as políticas ao contrário
 
@@ -274,6 +275,52 @@ como uma questão de financiamento: o plano é robusto, duas pessoas abaixo dele
 
 Confira: [`examples/08_the_payroll_behind_the_plan.py`](../examples/08_the_payroll_behind_the_plan.py) ·
 [`svclab.workforce`](../src/svclab/workforce/README.md)
+
+## 9. A fórmula estava sem um termo, e todo mundo teria calibrado em vez disso
+
+**A decisão.** Onde gastar a próxima semana de tempo analítico quando uma regra de decisão rende menos do
+que deveria — e, mais amplamente, se corrigir o insumo de um modelo ou o modelo.
+
+**O que o case dizia.** O achado 3 diagnosticou a própria fórmula do limiar: ela quer uma probabilidade e
+o score do classificador não é uma, então **calibre o score**. Essa era a conclusão do próprio
+repositório e ficou sem contestação por seis ondas.
+
+**O que a conta diz.** O diagnóstico estava meio certo e apontava para a metade mais barata. Calibrar o
+score é trabalho real com retorno real — o erro de calibração da margem crua é **0,1618** contra
+**0,0061** de um controle perfeitamente calibrado, **26,68** vezes, e no bin em que o score diz
+**0,6502**, **0,9078** dos rótulos estão certos. Calibrar corta a penalidade da fórmula **3,59** vezes, de
+**17,04%** para **4,74%**.
+
+Mas entregue à fórmula a probabilidade que o gerador realmente usa — onde não resta calibração a fazer — e
+ela segue **7,33%** fora do ótimo varrido. Então o insumo nunca foi o problema inteiro. A fórmula
+precifica um rótulo errado e uma postergação e trata um rótulo **certo** como **gratuito**, quando um
+contato corretamente rotulado que o bot resolve *economiza* os segundos humanos que ele teria consumido.
+Esse termo omitido é todo o argumento para implantar um bot, e ele corre no sentido oposto ao custo do
+erro: **142,68** segundos na intenção mais barata contra **23,32** na mais cara. Então a regra está mais
+errada exatamente onde o bot é mais útil — exige 0,6667 de confiança onde **0,1974** basta.
+
+Carregue o termo e a penalidade cai para **1,96%**. O que dá o resultado que decide a semana: **342,14**
+segundos usando a fórmula corrigida sobre o score *não calibrado* vencem **367,54** usando a fórmula
+original sobre o *perfeito*. Corrigir o modelo venceu corrigir o insumo por cerca de quatro para um.
+
+Duas outras correções caem no mesmo lugar. Um limiar ajustado num período custa **1,5076** segundo por
+contato mais no seguinte do que o melhor daquele próprio período — **0,45%** da conta, **13,05%** da
+economia que o achado 3 publicou — e concentra onde o erro é caro e a amostra é rala. Ainda assim os
+cortes se movem muito mais que o custo, de **0,10** para **0,24** na maior intenção por um décimo de
+segundo: **a curva de custo é plana perto do ótimo, então o custo foi aprendido e o corte não.** E chavear
+a regra no rótulo que um roteador realmente consegue ler — o palpite do classificador em vez da verdade —
+*melhora* o resultado, **11,9210** segundos economizados contra **10,9487**, porque um rótulo errado é o
+evento de que o custo é feito, então o rótulo reportado carrega informação sobre o erro e o verdadeiro não
+carrega nenhuma.
+
+**O que fazer em vez disso.** Antes de calibrar qualquer coisa, escreva todos os desfechos que a regra de
+decisão precifica e confira se nenhum está sendo assumido como gratuito — o termo omitido costuma ser o
+benefício, porque benefício é a parte pela qual ninguém é cobrado. Reporte o custo no limiar escolhido,
+não o limiar. E prefira a regra que seu sistema consegue executar; ela pode ser a melhor regra, não o
+compromisso.
+
+Confira: [`examples/09_the_threshold_fitted_on_the_answer.py`](../examples/09_the_threshold_fitted_on_the_answer.py) ·
+[`svclab.calibration`](../src/svclab/calibration/README.md)
 
 ## O que nada disso diz
 

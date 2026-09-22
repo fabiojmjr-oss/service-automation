@@ -125,8 +125,9 @@ precificadas:
   deveria melhorar.** Postergar abaixo de `1 − custo_de_postergar / custo_de_erro` é exatamente ótimo num
   score que *é* a probabilidade de o rótulo estar certo. Este score é uma margem, então o **ordenamento**
   dos cinco intents que a fórmula produz sobrevive intacto e os **níveis** não — ela posterga 23.304 de
-  31.802 contatos para evitar 2.414 erros de roteamento. Calibração é o passo que falta, e a fórmula o
-  assume em silêncio.
+  31.802 contatos para evitar 2.414 erros de roteamento. A onda 3 concluiu que calibração era o passo
+  que faltava. **Não é** — a onda 9 deu à fórmula a probabilidade que o gerador realmente usou e ela
+  seguiu 7,33% fora, porque o que a fórmula omite é um termo, não uma calibração. Ver abaixo.
 - **O headcount prometido é alcançável, se 29% dos clientes desistirem.** Erlang C não tem nada a dizer
   abaixo de oito atendentes nesta carga: a fila cresce sem limite, e o nível de serviço é reportado como
   zero porque não existe espera a reportar. Erlang A tem resposta — com **seis** atendentes a fila é
@@ -341,6 +342,53 @@ trabalho e o quadro na folha são dois números unidos por um ponto fixo, não p
   a válvula de escape. **É a terceira vez neste repositório que o abandono é o que impede algo de
   divergir** — e é a coisa que o negócio está tentando não fazer.
 
+## E a fórmula que precificou tudo isso não tinha um termo, não faltava calibração
+
+A onda 3 aplicou o limiar de roteamento de manual ao score do classificador desta conta, achou-o **12,5%**
+pior que o número único varrido, e concluiu que **calibração era o passo que faltava**. Era uma afirmação
+sem controle atrás. O controle existe agora — a probabilidade que o gerador realmente usa — e o
+diagnóstico não sobrevive a ele.
+
+- **Calibração é real, e não é o passo que falta.** Ajustado em três quintos do mês e julgado nos
+  **12.709** contatos restantes, o erro de calibração da margem crua é **0,1618** contra **0,0061** do
+  controle — **26,68 vezes** — e no bin em que o score diz **0,6502**, **0,9078** dos rótulos estão
+  certos. Calibrá-lo corta a penalidade da fórmula **3,59 vezes**, de **17,04%** para **4,74%**. Mas sobre
+  a probabilidade perfeitamente calibrada a penalidade ainda é **7,33%**, e ali não resta calibração
+  alguma a fazer.
+- **O que faltava é a razão de o bot existir.** A forma fechada precifica um rótulo errado e uma
+  postergação e trata um rótulo **certo** como gratuito — quando um contato corretamente rotulado que o
+  bot resolve *economiza* os segundos humanos que ele teria consumido. Carregue esse termo e a regra passa
+  a ser `(erro − postergar) / (erro + benefício)`, que é exatamente a fórmula original quando o benefício
+  é zero. O benefício corre no sentido **oposto** ao custo do erro — **142,68** segundos no rastreio
+  contra **23,32** na reclamacao — então a fórmula que só precifica erros está mais errada onde o bot é
+  mais útil: ela exige 0,6667 de confiança no rastreio onde **0,1974** basta. A penalidade cai para
+  **1,96%** na margem crua e **0,19%** na calibrada. **E 342,14 segundos na margem não calibrada vencem
+  367,54 na probabilidade que o gerador realmente usou** — corrigir o modelo venceu corrigir o insumo, e a
+  onda 3 apontou para o insumo.
+- **O score melhor calibrado é o pior ordenador.** O controle tem o menor erro de calibração da tabela e o
+  **maior** custo varrido, **342,4383** contra **335,5655** da margem crua, porque é o único score que não
+  sabe o que o classificador de fato viu. Calibração e discriminação são propriedades diferentes — o
+  instrumento não viesado e inútil da onda 2, num segundo cenário.
+- **O otimismo é um décimo do achado, e o limiar nunca foi a coisa aprendida.** Um limiar varrido nos
+  primeiros três quintos custa **1,5076** segundo por contato mais no período posterior do que o melhor
+  daquele próprio período: **0,45%** da conta e **13,05%** dos 11,5552 segundos que a onda 3 publicou. Ele
+  concentra onde o erro é caro e a amostra é rala — **4,1790** no reembolso e **3,2614** na reclamacao, os
+  dois menores grupos e os dois erros mais custosos. E os cortes se movem muito mais que o custo: rastreio
+  de **0,10** para **0,24**, prazo-de-entrega de 0,22 para 0,38, por **0,1116** de segundo. **A curva de
+  custo é plana perto do ótimo, então o custo foi aprendido e o corte não** — uma operação discutindo a
+  segunda decimal de um limiar está discutindo ruído de amostragem.
+- **E o rótulo que um roteador realmente consegue ler é o melhor para chavear.** A regra por intenção da
+  onda 3 pedia o limiar de reclamacao num contato que *é* uma reclamação, o que nenhuma implantação pode
+  fazer. O roadmap previu que o ganho encolheria. Ele cresce: chaveada no próprio rótulo do classificador
+  a regra economiza **11,9210** segundos por contato contra **10,9487** chaveada na verdade, com **75
+  erros de rota menos**, porque um rótulo errado é o evento de que o custo é feito — então o rótulo
+  reportado carrega informação sobre o classificador estar errado e o rótulo verdadeiro não carrega
+  nenhuma. **Condicionar no que você sabe vence condicionar no que é verdade, quando o que você sabe é
+  aquilo de que o erro é feito.** Fora da amostra e chaveada no rótulo legível, a economia da onda 3 passa
+  a ser **11,9210** contra os 11,5552 publicados — uma razão de **1,0317**, **105,31** horas no volume
+  tratado do mês. Duas correções, sinais opostos, quase se cancelando: a cifra sobrevive por uma razão que
+  a onda 3 não nomeou.
+
 ## Módulos
 
 | Módulo | O que decide |
@@ -356,6 +404,7 @@ trabalho e o quadro na folha são dois números unidos por um ponto fixo, não p
 | [`svclab.concentration`](src/svclab/concentration/README.md) | O que o agrupamento decide quando os clientes não contatam todos igualmente: quão desiguais os grupos realmente são, qual dos dois tamanhos de grupo entra num efeito de desenho, quem paga pelas falhas, e quanta precisão uma estimativa por cliente perde. |
 | [`svclab.chain`](src/svclab/chain/README.md) | O que custa um contato que volta duas vezes, quão longa é de fato uma cadeia de retornos e a forma fechada que diz por quê, e o terceiro ranking das políticas — dias até resolver, que nenhuma taxa contém. |
 | [`svclab.planning`](src/svclab/planning/README.md) | Que headcount um conjunto de tetos declarados compra em vez do que uma meta única reporta, qual dos tetos de fato decidiu, como isso muda com o tamanho da fila, e a que distância de furar o plano escolhido está. |
+| [`svclab.calibration`](src/svclab/calibration/README.md) | Se a forma fechada de um limiar de roteamento recebeu o insumo errado ou está sem um termo, o que um limiar ajustado num período custa no seguinte, e em qual rótulo uma regra que uma implantação consegue rodar precisa ser chaveada. |
 | [`svclab.workforce`](src/svclab/workforce/README.md) | O que uma ocupação custa em pessoas em vez do que um teto proíbe: a folha atrás de uma contagem de atendentes, a taxa de câmbio entre ocupação e contratação, e se o laço de rotatividade que ela fecha alguma vez escapa. |
 
 Todo README de módulo é bilíngue e traz uma seção **Premissas e limitações**, porque uma cifra sem suas
@@ -372,6 +421,7 @@ premissas não é um resultado.
 | [`examples/05_the_frequent_caller.py`](examples/05_the_frequent_caller.py) | Os mesmos contatos reagrupados em clientes que contatam em taxas diferentes, com os pesados correlacionados aos difíceis: a forma dos grupos, o efeito de desenho que retorna, quem paga por ele, e o que custa à precisão da estimativa da onda 1. |
 | [`examples/06_the_contact_that_came_back_twice.py`](examples/06_the_contact_that_came_back_twice.py) | A cauda que cinco ondas truncaram, rodada até seu fim declarado: quantas tentativas um contato leva, a série geométrica que diz quando isso importa, o que a cadeia custa a cada política, e o ranking que tem tempo dentro. |
 | [`examples/07_the_constraint_nobody_declared.py`](examples/07_the_constraint_nobody_declared.py) | Os três tetos declarados em vez de reportados: o que cada um compra sozinho, no que a fila estável da onda 3 falha, onde a economia de escala para, e quanto espaço sobra no plano escolhido. |
+| [`examples/09_the_threshold_fitted_on_the_answer.py`](examples/09_the_threshold_fitted_on_the_answer.py) | A forma fechada recebendo o insumo que ela assume e depois o termo que lhe faltava: a confiabilidade do score, as quatro versões dele precificadas contra uma varredura, o que um limiar custa num período que nunca viu, e a regra chaveada no rótulo que um roteador consegue ler. |
 | [`examples/08_the_payroll_behind_the_plan.py`](examples/08_the_payroll_behind_the_plan.py) | O teto de ocupação precificado em pessoas: a folha que cada plano de fato exige, o que um ponto de ocupação compra em contratação, a fila onde não há o que trocar, e quão mais forte a curva de rotatividade teria de ser para espiralar. |
 
 ## Instalar e rodar
@@ -388,12 +438,13 @@ python examples/05_the_frequent_caller.py
 python examples/06_the_contact_that_came_back_twice.py
 python examples/07_the_constraint_nobody_declared.py
 python examples/08_the_payroll_behind_the_plan.py
+python examples/09_the_threshold_fitted_on_the_answer.py
 ```
 
 ## Como as afirmações são mantidas honestas
 
-**376 testes, 100% de cobertura de linhas e de ramos.** 312 deles rodam em segundos e liberam cada push.
-Os 64 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
+**431 testes, 100% de cobertura de linhas e de ramos.** 359 deles rodam em segundos e liberam cada push.
+Os 72 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
 rodam o script de exemplo. Uma mudança que mova um número publicado quebra o build em vez de deixar o
 texto silenciosamente errado.
 
@@ -418,7 +469,7 @@ modo que a posição no stream depende de quantos valores são pedidos e não de
 responde. Essa regra é verificada contra o código-fonte, porque um repositório irmão publicou cifras
 que valiam numa máquina e mudavam numa instalação limpa.
 
-**E defeitos são registrados em vez de corrigidos em silêncio.** Trinta e quatro até aqui, em
+**E defeitos são registrados em vez de corrigidos em silêncio.** Trinta e sete até aqui, em
 [`docs/ROADMAP.md`](docs/ROADMAP.md), cada um deles achado conectando os módulos, por um caso de
 controle ou verificando uma frase — nenhum lendo código. Dois valem a leitura. A sessão original cobrava
 um recontato como segundos extras em vez de como uma linha, o que torna o desvio aritmeticamente

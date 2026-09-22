@@ -24,8 +24,14 @@ is right - the rule is to defer below ``1 - defer_cost / misroute_cost``, which
 :func:`calibrated_threshold` returns. The score in this generator is a **margin**, informative about
 correctness but not calibrated to it, and applying the closed form to it anyway is measurably worse
 than sweeping. What survives is the formula's *ranking*: it orders the intents by caution exactly as
-the swept optima do, and its levels are far too high. Calibration is the missing step, and the
-closed form assumes it silently.
+the swept optima do, and its levels are far too high.
+
+This module concluded from that that calibration was the missing step. It is not the whole of it:
+:mod:`svclab.calibration` gave the closed form the probability this generator actually uses and the
+formula was still 7.33% worse than sweeping, because it prices a wrong label and a deferral and
+treats a **right** label as free - which is the entire reason a bot is deployed. See
+:func:`svclab.calibration.amended_threshold` for the same derivation carrying that term, and note
+that it beats this formula on the uncalibrated score.
 """
 
 from __future__ import annotations
@@ -83,29 +89,37 @@ def defer_below(
     contacts: pd.DataFrame,
     scores: pd.DataFrame,
     threshold: float | dict[str, float],
+    key: str = "intent",
 ) -> pd.DataFrame:
     """The contact table with a ``defer`` column: send it past the bot below the threshold.
 
     Args:
         contacts: The contact table.
         scores: The routing scores, from :func:`svclab.synth.routing_scores`.
-        threshold: One threshold for the whole queue, or one per **predicted** intent. Per intent is
-            the interesting case and the harder one to deploy, because the rule has to be keyed on
-            what the classifier thinks rather than on what the contact is.
+        threshold: One threshold for the whole queue, or one per intent.
+        key: Which column a per-intent mapping is keyed on. The default is the **true** intent,
+            which is what wave 3 priced and what no deployment can read; pass ``predicted_intent``
+            for the rule a deployment can actually run, and see
+            :mod:`svclab.calibration.selection` for what the difference costs. This argument exists
+            because the first version of this function had one behaviour and a docstring describing
+            the other.
 
     Returns:
         A copy of the contact table with ``classifier_score`` and ``defer`` added.
 
     Raises:
-        KeyError: If a per-intent mapping has no threshold for an intent that appears.
+        KeyError: If the key is not a column, or a per-intent mapping has no threshold for an intent
+            that appears under it.
     """
     joined = contacts.merge(scores, on="contact", how="left")
     score = joined["classifier_score"].to_numpy(dtype=float)
     if isinstance(threshold, dict):
-        missing = set(joined["intent"]) - set(threshold)
+        if key not in joined.columns:
+            raise KeyError(f"{key!r} is not a column to key the thresholds on")
+        missing = set(joined[key]) - set(threshold)
         if missing:
             raise KeyError(f"no threshold for {sorted(missing)}")
-        cut = joined["intent"].map(threshold).to_numpy(dtype=float)
+        cut = joined[key].map(threshold).to_numpy(dtype=float)
     else:
         cut = np.full(len(joined), float(threshold))
     joined["defer"] = score < cut

@@ -488,3 +488,39 @@ WORKFORCE = WorkforceProfile(
     ramp_months=2.0,
     ramp_productivity=0.60,
 )
+
+
+@dataclass(frozen=True)
+class CalibrationProfile:
+    """How the classifier's score is turned into a probability, and on what part of the period.
+
+    Wave 3 applied the closed-form threshold to a score that was a margin and published the result
+    as a defect of the input rather than of the formula. This profile is what that diagnosis needs
+    to be tested: a declared way of mapping the score onto the probability the label is right,
+    fitted on one part of the month and judged on another.
+
+    Attributes:
+        fit_share: Share of the period whose contacts the calibrator and the thresholds are fitted
+            on. The rest is held out, because a threshold swept and priced on the same contacts is
+            an upper bound on what it will deliver and wave 3 quoted one.
+        bins: Equal-width bins of the reliability table. Ten is conventional and arbitrary; the
+            expected calibration error moves with it, which is why the table is published beside it.
+        platt_steps: Most Newton steps the logistic fit takes before it gives up.
+        platt_tolerance: Step size below which the logistic fit is called converged.
+    """
+
+    fit_share: float
+    bins: int
+    platt_steps: int
+    platt_tolerance: float
+
+
+#: Three fifths of the month to fit on, two to be judged on. A calendar split rather than a random
+#: one, because the thing a held-out period tests for is drift over time, and a random split cannot
+#: see it.
+CALIBRATION = CalibrationProfile(
+    fit_share=0.60,
+    bins=10,
+    platt_steps=100,
+    platt_tolerance=1e-10,
+)

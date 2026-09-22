@@ -11,6 +11,7 @@ their policy and by nothing else.
 """
 
 from .config import (
+    CALIBRATION,
     CENTRE,
     CHAIN,
     CONCENTRATION,
@@ -24,6 +25,7 @@ from .config import (
     SEED,
     SINGLE_RETURN,
     WORKFORCE,
+    CalibrationProfile,
     CentreProfile,
     ChainProfile,
     ConcentrationProfile,
@@ -49,6 +51,7 @@ from .returns import RETURN_DRAW_COLUMNS, return_draws
 from .routing import ROUTING_SCORE_COLUMNS, accuracy_curve, routing_scores
 
 __all__ = [
+    "CALIBRATION",
     "CENTRE",
     "CONTACT_COLUMNS",
     "GRADERS",
@@ -70,6 +73,7 @@ __all__ = [
     "SINGLE_RETURN",
     "WORKFORCE",
     "TRUTH_DRAW_COLUMNS",
+    "CalibrationProfile",
     "CentreProfile",
     "ChainProfile",
     "ConcentrationProfile",

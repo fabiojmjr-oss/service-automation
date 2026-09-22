@@ -16,7 +16,26 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from svclab.bot import GUARDED, HUMAN_ONLY, PATIENT, POLICIES, THREE_TURNS, run
+from svclab.bot import (
+    GUARDED,
+    HUMAN_ONLY,
+    PATIENT,
+    POLICIES,
+    THREE_TURNS,
+    classifier_labels,
+    run,
+)
+from svclab.calibration import (
+    amended_threshold,
+    calibrated_scores,
+    expected_calibration_error,
+    fit_period,
+    formula_table,
+    key_table,
+    optimism_table,
+    reliability_table,
+    resolve_benefit,
+)
 from svclab.capacity import (
     agents_for,
     capacity_table,
@@ -69,6 +88,7 @@ from svclab.quality import (
 )
 from svclab.routing import best_by, calibrated_threshold, cost_curve, cost_of, defer_below
 from svclab.synth import (
+    CALIBRATION,
     CENTRE,
     CHAIN,
     EQUAL_RATES,
@@ -1443,3 +1463,165 @@ def test_the_sizing_table_is_what_is_published(full: Dataset) -> None:
     assert float(heavy["contacts_per_arm"]) / float(plain["contacts_per_arm"]) - 1.0 == (
         pytest.approx(0.289, abs=5e-4)
     )
+
+
+# --- Wave 9: the threshold fitted on the answer, in svclab.calibration -------------------------
+
+
+@pytest.fixture(scope="module")
+def routed_month(full: Dataset) -> pd.DataFrame:
+    """The treated arm carrying the label the classifier reported, which is what a router can read."""
+    frame = full.contacts[~full.contacts["holdout"]].copy()
+    labels = classifier_labels(frame)
+    return frame.merge(labels[["contact", "predicted_intent"]], on="contact", how="left")
+
+
+@pytest.fixture(scope="module")
+def formula(full: Dataset, routed_month: pd.DataFrame) -> pd.DataFrame:
+    """The closed form against the sweep on all four versions of the score. Minutes, not seconds."""
+    return formula_table(routed_month, full.routing_scores).set_index("score")
+
+
+def test_the_period_split_is_the_size_that_is_published(routed_month: pd.DataFrame) -> None:
+    fitting = fit_period(routed_month)
+    assert len(routed_month) == 31_802
+    assert int(fitting.sum()) == 19_093
+    assert int((~fitting).sum()) == 12_709
+    assert CALIBRATION.fit_share * CENTRE.days * 24.0 == pytest.approx(432.0)
+    assert float(fitting.mean()) == pytest.approx(0.6004, abs=5e-5)
+
+
+def test_the_calibration_errors_are_what_is_published(formula: pd.DataFrame) -> None:
+    published = {"raw": 0.1618, "isotonic": 0.0066, "platt": 0.0123, "true": 0.0061}
+    for score, error in published.items():
+        assert float(formula.loc[score, "calibration_error"]) == pytest.approx(error, abs=5e-5)
+    # The control's error is the floor the binning imposes, and isotonic sits on it.
+    assert float(formula.loc["raw", "calibration_error"]) / float(
+        formula.loc["true", "calibration_error"]
+    ) == pytest.approx(26.68, abs=5e-3)
+
+
+def test_the_worst_bin_of_the_raw_score_is_what_is_published(
+    full: Dataset, routed_month: pd.DataFrame
+) -> None:
+    correct = classifier_labels(routed_month)["classified_correctly"].to_numpy(dtype=bool)
+    score = calibrated_scores(routed_month, full.routing_scores)["raw"][
+        "classifier_score"
+    ].to_numpy(dtype=float)
+    later = ~fit_period(routed_month)
+    table = reliability_table(score[later], correct[later]).set_index("bin")
+    assert int(table.loc[6, "contacts"]) == 2_333
+    assert float(table.loc[6, "mean_score"]) == pytest.approx(0.6502, abs=5e-5)
+    assert float(table.loc[6, "share_correct"]) == pytest.approx(0.9078, abs=5e-5)
+    assert float(table.loc[6, "gap"]) == pytest.approx(0.2576, abs=5e-5)
+    assert float(table["gap"].max()) == pytest.approx(0.2576, abs=5e-5)
+    assert expected_calibration_error(table.reset_index()) == pytest.approx(0.1618, abs=5e-5)
+
+
+def test_the_benefit_and_the_two_closed_forms_are_what_is_published(
+    full: Dataset, routed_month: pd.DataFrame
+) -> None:
+    published = {
+        "rastreio": (60.0, 142.6765, 0.6667, 0.1974),
+        "prazo-de-entrega": (90.0, 139.1125, 0.7778, 0.3055),
+        "cadastro": (150.0, 161.7857, 0.8667, 0.4170),
+        "reembolso": (420.0, 65.5821, 0.9524, 0.8238),
+        "reclamacao": (540.0, 23.3190, 0.9630, 0.9231),
+    }
+    benefit = resolve_benefit(routed_month[fit_period(routed_month)], full.routing_scores)
+    for intent, (seconds, saved, naive, amended) in published.items():
+        assert ROUTING.misroute_seconds[intent] == seconds, intent
+        assert benefit[intent] == pytest.approx(saved, abs=5e-5), intent
+        assert calibrated_threshold(ROUTING.defer_seconds, seconds) == pytest.approx(
+            naive, abs=5e-5
+        ), intent
+        assert amended_threshold(ROUTING.defer_seconds, seconds, benefit[intent]) == pytest.approx(
+            amended, abs=5e-5
+        ), intent
+
+
+def test_the_closed_form_against_the_sweep_is_what_is_published(formula: pd.DataFrame) -> None:
+    published = {
+        "raw": (392.7469, 342.1386, 335.5655, 0.1704, 0.0196),
+        "isotonic": (351.5371, 336.2623, 335.6177, 0.0474, 0.0019),
+        "platt": (351.6284, 336.5567, 335.5214, 0.0480, 0.0031),
+        "true": (367.5370, 344.2607, 342.4383, 0.0733, 0.0053),
+    }
+    for score, (naive, amended, best, naive_penalty, amended_penalty) in published.items():
+        row = formula.loc[score]
+        assert float(row["naive_seconds"]) == pytest.approx(naive, abs=5e-4), score
+        assert float(row["amended_seconds"]) == pytest.approx(amended, abs=5e-4), score
+        assert float(row["swept_seconds"]) == pytest.approx(best, abs=5e-4), score
+        assert float(row["naive_penalty"]) == pytest.approx(naive_penalty, abs=5e-5), score
+        assert float(row["amended_penalty"]) == pytest.approx(amended_penalty, abs=5e-5), score
+
+    # Calibration cuts the naive formula's penalty by this factor, and does not remove it.
+    assert float(formula.loc["raw", "naive_penalty"]) / float(
+        formula.loc["isotonic", "naive_penalty"]
+    ) == pytest.approx(3.59, abs=5e-3)
+    # And the term matters more than the input: the amended rule on the raw margin beats the naive
+    # rule on the probability the generator actually used.
+    assert float(formula.loc["raw", "amended_seconds"]) < float(
+        formula.loc["true", "naive_seconds"]
+    )
+    # The control is the best-calibrated score and the worst ranker, because it is the only one that
+    # does not know what the classifier saw.
+    assert float(formula.loc["true", "swept_seconds"]) > float(formula.loc["raw", "swept_seconds"])
+
+
+def test_the_optimism_of_the_swept_thresholds_is_what_is_published(
+    full: Dataset, routed_month: pd.DataFrame
+) -> None:
+    published = {
+        "rastreio": (4_257, 0.10, 0.24, 0.1116),
+        "prazo-de-entrega": (2_998, 0.22, 0.38, 0.9893),
+        "cadastro": (1_826, 0.38, 0.34, 1.0777),
+        "reembolso": (2_091, 0.62, 0.60, 4.1790),
+        "reclamacao": (1_537, 0.62, 0.72, 3.2614),
+    }
+    table = optimism_table(routed_month, full.routing_scores).set_index("intent")
+    for intent, (contacts, fitted, later, optimism) in published.items():
+        row = table.loc[intent]
+        assert int(row["contacts"]) == contacts, intent
+        assert float(row["fitted_threshold"]) == pytest.approx(fitted, abs=5e-3), intent
+        assert float(row["later_threshold"]) == pytest.approx(later, abs=5e-3), intent
+        assert float(row["optimism"]) == pytest.approx(optimism, abs=5e-4), intent
+
+    queue = table.loc["queue"]
+    assert int(queue["contacts"]) == 12_709
+    assert float(queue["fitted_seconds"]) == pytest.approx(337.0731, abs=5e-4)
+    assert float(queue["later_seconds"]) == pytest.approx(335.5655, abs=5e-4)
+    assert float(queue["optimism"]) == pytest.approx(1.5076, abs=5e-4)
+    assert float(queue["optimism"]) / float(queue["later_seconds"]) == pytest.approx(
+        0.0045, abs=5e-5
+    )
+    # Which is this share of the saving wave 3 published in sample.
+    assert float(queue["optimism"]) / 11.5552 == pytest.approx(0.1305, abs=5e-4)
+
+
+def test_the_deployable_key_beats_the_one_wave_three_priced(
+    full: Dataset, routed_month: pd.DataFrame
+) -> None:
+    published = {
+        "single": (348.0218, 0.7141, 857, 3_191, 0.0),
+        "intent": (337.0731, 0.6916, 1_522, 2_309, 10.9487),
+        "predicted_intent": (336.1007, 0.6915, 1_447, 2_291, 11.9210),
+    }
+    table = key_table(routed_month, full.routing_scores).set_index("key")
+    for key, (seconds, resolution, misroutes, deferred, saving) in published.items():
+        row = table.loc[key]
+        assert float(row["seconds_per_contact"]) == pytest.approx(seconds, abs=5e-4), key
+        assert float(row["resolution_rate"]) == pytest.approx(resolution, abs=5e-5), key
+        assert int(row["misroutes"]) == misroutes, key
+        assert int(row["deferred"]) == deferred, key
+        assert float(row["saving_against_single"]) == pytest.approx(saving, abs=5e-4), key
+
+    deployable = float(table.loc["predicted_intent", "saving_against_single"])
+    assert deployable > float(table.loc["intent", "saving_against_single"])
+    assert (
+        int(table.loc["predicted_intent", "misroutes"]) - int(table.loc["intent", "misroutes"])
+        == -75
+    )
+    assert deployable * 12_709 / 3600.0 == pytest.approx(42.08, abs=5e-3)
+    assert deployable * 31_802 / 3600.0 == pytest.approx(105.31, abs=5e-3)
+    assert deployable / 11.5552 == pytest.approx(1.0317, abs=5e-5)

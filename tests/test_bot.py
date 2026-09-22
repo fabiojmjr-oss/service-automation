@@ -14,6 +14,7 @@ import pytest
 from svclab.bot import (
     GUARDED,
     HUMAN_ONLY,
+    LABEL_COLUMNS,
     OUTCOME_COLUMNS,
     OUTCOMES,
     PATIENT,
@@ -21,6 +22,7 @@ from svclab.bot import (
     REPEAT_SESSION_OFFSET,
     THREE_TURNS,
     BotPolicy,
+    classifier_labels,
     run,
 )
 from svclab.synth import CENTRE, Dataset
@@ -142,6 +144,22 @@ class TestThePropertiesEveryComparisonNeeds:
             broken = full.contacts.head(100).drop(columns=[column])
             with pytest.raises(KeyError, match="missing"):
                 run(broken, THREE_TURNS)
+
+    def test_the_reported_label_is_what_the_outcome_frame_carries(self, full: Dataset) -> None:
+        """Lifted out of `run` for wave 9, so the two have to agree on every contact."""
+        contacts = full.contacts.head(2_000)
+        reported = classifier_labels(contacts)
+        assert list(reported.columns) == list(LABEL_COLUMNS)
+        first = run(contacts, THREE_TURNS)
+        first = first[~first["is_repeat"]].set_index("contact")
+        for column in ("classified_correctly", "predicted_intent"):
+            assert list(first[column].reindex(reported["contact"])) == list(reported[column])
+
+    def test_the_reported_label_needs_the_columns_it_is_built_from(self, full: Dataset) -> None:
+        for column in ("intent", "difficulty", "classifier_draw"):
+            broken = full.contacts.head(100).drop(columns=[column])
+            with pytest.raises(KeyError, match="missing"):
+                classifier_labels(broken)
 
     def test_the_columns_and_outcomes_are_the_declared_ones(self, full: Dataset) -> None:
         outcomes = run(full.contacts.head(4_000), THREE_TURNS)

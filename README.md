@@ -124,8 +124,9 @@ priced:
   it was meant to improve on.** Deferring below `1 − defer_cost / misroute_cost` is exactly optimal on a
   score that *is* the probability the label is right. This score is a margin, so the formula's
   **ranking** of the five intents survives intact and its **levels** do not — it defers 23,304 of 31,802
-  contacts to avoid 2,414 misroutes. Calibration is the missing step, and the formula assumes it
-  silently.
+  contacts to avoid 2,414 misroutes. Wave 3 concluded that calibration was the missing step. It is
+  **not** — wave 9 gave the formula the probability the generator actually used and it was still 7.33%
+  off, because what the formula omits is a term rather than a calibration. See below.
 - **The promised headcount is reachable, if 29% of the customers give up.** Erlang C has nothing to say
   below eight agents at this load: the queue grows without bound, and the service level is reported as
   zero because there is no wait to report. Erlang A does have an answer — at **six** agents the queue is
@@ -339,6 +340,53 @@ joined by a fixed point rather than by a margin.
   the abandonment is the escape valve. **That is the third time in this repository that abandonment is
   what stops something from diverging**, and it is the thing the business is trying not to do.
 
+## And the formula that priced all of it was missing a term, not a calibration
+
+Wave 3 applied the textbook routing threshold to this account's classifier score, found it **12.5%**
+worse than the single swept number, and concluded that **calibration was the missing step**. That was an
+assertion with no control behind it. The control exists now — the probability the generator actually uses
+— and the diagnosis does not survive it.
+
+- **Calibration is real, and it is not the missing step.** Fitted on three fifths of the month and judged
+  on the remaining **12,709** contacts, the raw score's calibration error is **0.1618** against the
+  control's **0.0061** — **26.68 times** — and in the bin where the score says **0.6502**, **0.9078** of
+  the labels are right. Calibrating it cuts the formula's penalty **3.59 times**, from **17.04%** to
+  **4.74%**. But on the perfectly calibrated probability the penalty is still **7.33%**, and there is no
+  calibration left to do there.
+- **What was missing is the reason the bot exists.** The closed form prices a wrong label and a deferral
+  and treats a **right** label as free — when a correctly labelled contact the bot resolves *saves* the
+  human seconds it would have taken. Carry that term and the rule becomes `(misroute − defer) /
+  (misroute + benefit)`, which is the original formula exactly at a benefit of zero. The benefit runs the
+  **opposite way** to the misroute cost — **142.68** seconds on rastreio against **23.32** on reclamacao —
+  so the formula that prices only mistakes is most wrong where the bot is most useful: it demands 0.6667
+  confidence on rastreio where **0.1974** is enough. The penalty falls to **1.96%** on the raw margin and
+  **0.19%** on the calibrated one. **And 342.14 seconds on the uncalibrated margin beats 367.54 on the
+  probability the generator actually used** — fixing the model beat fixing the input, and wave 3 pointed
+  at the input.
+- **The best-calibrated score is the worst ranker.** The control has the lowest calibration error in the
+  table and the **highest** swept cost, **342.4383** against the raw margin's **335.5655**, because it is
+  the only score that does not know what the classifier actually saw. Calibration and discrimination are
+  different properties — wave 2's gauge that is unbiased and useless, in a second setting.
+- **Optimism is a tenth of the finding, and the threshold was never the thing that was learned.** A
+  threshold swept on the first three fifths costs **1.5076** seconds per contact more in the later period
+  than that period's own best: **0.45%** of the bill and **13.05%** of the 11.5552 seconds wave 3
+  published. It concentrates where the mistake is expensive and the sample is thin — **4.1790** on
+  reembolso and **3.2614** on reclamacao, the two smallest groups and the two dearest misroutes. And the
+  cuts move far more than the cost does: rastreio from **0.10** to **0.24**, prazo-de-entrega from 0.22 to
+  0.38, for **0.1116** of a second. **The cost curve is flat near its optimum, so the cost was learned and
+  the cut was not** — an operation arguing about a threshold's second decimal is arguing about sampling
+  noise.
+- **And the label a router can actually read is the better one to key on.** Wave 3's per-intent rule asked
+  for the reclamacao threshold on a contact that *is* a complaint, which no deployment can do. The roadmap
+  predicted the gain would shrink. It grows: keyed on the classifier's own label the rule saves
+  **11.9210** seconds per contact against **10.9487** keyed on the truth, with **75 fewer** misroutes,
+  because a wrong label is the event the cost is made of — so the reported label carries information about
+  the classifier being wrong and the true label carries none. **Conditioning on what you know beats
+  conditioning on what is true, when what you know is what the mistake is made of.** Out of sample and
+  keyed on the readable label, wave 3's saving becomes **11.9210** against its published 11.5552 — a ratio
+  of **1.0317**, **105.31** hours at the month's treated volume. Two corrections, opposite signs, nearly
+  cancelling: the figure survives for a reason wave 3 did not name.
+
 ## Modules
 
 | Module | What it decides |
@@ -354,6 +402,7 @@ joined by a fixed point rather than by a margin.
 | [`svclab.concentration`](src/svclab/concentration/README.md) | What grouping decides once customers do not all contact equally often: how unequal the clusters really are, which of the two cluster sizes belongs in a design effect, who pays for the failures, and how much precision a per-customer estimate loses. |
 | [`svclab.chain`](src/svclab/chain/README.md) | What a contact that comes back twice costs, how long a return chain really is and the closed form that says why, and the third ranking of the policies — days to resolution, which no rate contains. |
 | [`svclab.planning`](src/svclab/planning/README.md) | What headcount a set of declared ceilings buys rather than what one target reports, which of the ceilings actually decided it, how that changes with the size of the queue, and how close to breaching the chosen plan sits. |
+| [`svclab.calibration`](src/svclab/calibration/README.md) | Whether the closed form for a routing threshold was given the wrong input or is missing a term, what a threshold fitted on one period costs in the next, and which label a rule a deployment can run has to be keyed on. |
 | [`svclab.workforce`](src/svclab/workforce/README.md) | What an occupancy costs in people rather than what a ceiling forbids: the payroll behind an agent count, the exchange rate between occupancy and hiring, and whether the attrition loop it closes ever runs away. |
 
 Every module README is bilingual and carries an **Assumptions and limitations** section, because a
@@ -370,6 +419,7 @@ figure without its assumptions is not a result.
 | [`examples/05_the_frequent_caller.py`](examples/05_the_frequent_caller.py) | The identical contacts regrouped into customers who contact at different rates, with the heavy users correlated with the difficult ones: the shape of the clusters, the design effect that returns, who pays for it, and what it costs the precision of wave 1's estimate. |
 | [`examples/06_the_contact_that_came_back_twice.py`](examples/06_the_contact_that_came_back_twice.py) | The tail five waves truncated, run to its declared end: how many attempts a contact takes, the geometric series that says when that matters, what the chain costs each policy, and the ranking with time in it. |
 | [`examples/07_the_constraint_nobody_declared.py`](examples/07_the_constraint_nobody_declared.py) | The three ceilings declared instead of reported: what each buys on its own, what wave 3's stable queue fails, where the economy of scale stops, and how much room the chosen plan has left. |
+| [`examples/09_the_threshold_fitted_on_the_answer.py`](examples/09_the_threshold_fitted_on_the_answer.py) | The closed form given the input it assumes and then the term it was missing: the reliability of the score, the four versions of it priced against a sweep, what a threshold costs in a period it never saw, and the rule keyed on the label a router can read. |
 | [`examples/08_the_payroll_behind_the_plan.py`](examples/08_the_payroll_behind_the_plan.py) | The occupancy ceiling priced in people: the payroll each plan actually needs, what a point of occupancy buys in hiring, the queue where there is nothing to trade, and how much steeper the attrition curve would have to be to spiral. |
 
 ## Install and run
@@ -386,12 +436,13 @@ python examples/05_the_frequent_caller.py
 python examples/06_the_contact_that_came_back_twice.py
 python examples/07_the_constraint_nobody_declared.py
 python examples/08_the_payroll_behind_the_plan.py
+python examples/09_the_threshold_fitted_on_the_answer.py
 ```
 
 ## How the claims are kept honest
 
-**376 tests, 100% statement and branch coverage.** 312 of them run in seconds and gate every push. The
-remaining 64 re-derive, from the generator, every figure quoted in every README on this repository,
+**431 tests, 100% statement and branch coverage.** 359 of them run in seconds and gate every push. The
+remaining 72 re-derive, from the generator, every figure quoted in every README on this repository,
 and run the example script. A change that moves a published number breaks the build instead of leaving
 the text quietly wrong.
 
@@ -416,7 +467,7 @@ position depends on how many values are asked for and not on which library versi
 is checked against the source, because a sibling repository published figures that held on one machine
 and moved on a clean install.
 
-**And defects are recorded rather than quietly fixed.** Thirty-four so far, in
+**And defects are recorded rather than quietly fixed.** Thirty-seven so far, in
 [`docs/ROADMAP.md`](docs/ROADMAP.md), every one of them found by connecting the modules, by a control
 case or by verifying a sentence — none by reading code. Two are worth reading. The original session
 charged a repeat contact as extra seconds rather than as a row, which makes deflection arithmetically

@@ -8,6 +8,10 @@ It also prices the closed form. On a score that *is* the probability the label i
 is to defer below ``1 - defer_cost / misroute_cost``. The score here is a margin rather than a
 probability, so that rule orders the intents correctly and sets every level far too high - which is
 the difference between a formula being wrong and a formula being applied to the wrong input.
+
+That reading was incomplete. :mod:`svclab.calibration` supplies the right input and the rule is
+still worse than sweeping, because it treats a correct label as free when a correct label is what
+the bot is for.
 """
 
 from .threshold import (

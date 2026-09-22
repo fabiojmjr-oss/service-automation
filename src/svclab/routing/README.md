@@ -102,8 +102,10 @@ contacts to avoid 2,414 misroutes.
 
 What survives is its **ranking**. The closed form orders the five intents by caution in exactly the
 order the swept optima do. The formula knows which intents deserve more care and cannot know how much,
-because the input it needs is a probability and nobody produced one. **Calibration is the missing
-step, and the closed form assumes it silently.**
+because the input it needs is a probability and nobody produced one. Calibration looked like the
+missing step, and **it is not the whole of it**: wave 9 gave the formula the probability this generator
+actually uses and it was still 7.33% worse than sweeping, because the formula treats a *correct* label
+as free. See [`svclab.calibration`](../calibration/README.md).
 
 The last row is not simply a mistake, either. It resolves **0.8611** against the swept rule's 0.6925,
 because deferring to a human resolves. It buys 17 points of resolution for 54.8 seconds a contact, and
@@ -250,7 +252,9 @@ score aqui é uma margem, então os **níveis** da fórmula são altos demais �
 O que sobrevive é seu **ordenamento**. A forma fechada ordena as cinco intenções por cautela exatamente
 na ordem em que os ótimos varridos o fazem. A fórmula sabe quais intenções merecem mais cuidado e não
 consegue saber quanto, porque a entrada de que ela precisa é uma probabilidade e ninguém produziu uma.
-**Calibração é o passo que falta, e a forma fechada a supõe em silêncio.**
+Calibração parecia ser o passo que faltava, e **não é o todo dele**: a onda 9 deu à fórmula a
+probabilidade que este gerador realmente usa e ela seguiu 7,33% pior que varrer, porque a fórmula trata
+um rótulo *correto* como gratuito. Ver [`svclab.calibration`](../calibration/README.md).
 
 A última linha também não é simplesmente um erro. Ela resolve **0,8611** contra os 0,6925 da regra
 varrida, porque postergar para um humano resolve. Compra 17 pontos de resolução por 54,8 segundos por

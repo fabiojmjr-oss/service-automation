@@ -227,6 +227,12 @@ def test_the_recorded_defect_count_matches_the_roadmap() -> None:
         32: ("Thirty-two", "Trinta e dois"),
         33: ("Thirty-three", "Trinta e três"),
         34: ("Thirty-four", "Trinta e quatro"),
+        35: ("Thirty-five", "Trinta e cinco"),
+        36: ("Thirty-six", "Trinta e seis"),
+        37: ("Thirty-seven", "Trinta e sete"),
+        38: ("Thirty-eight", "Trinta e oito"),
+        39: ("Thirty-nine", "Trinta e nove"),
+        40: ("Forty", "Quarenta"),
     }
     assert recorded in words, f"{recorded} defects recorded, and no word for it here"
     english_word, portuguese_word = words[recorded]

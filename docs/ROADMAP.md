@@ -520,6 +520,80 @@ trying not to do, and noticing that three times is what made it worth writing do
    the boundary it is - the occupancy-attrition problem is a large-queue problem, the same boundary
    wave 7 found for its binding ceiling.
 
+## Wave 9 — the threshold that was fitted on the answer *(complete)*
+
+Wave 3 applied the textbook routing threshold to a margin, found it 12.5% worse than sweeping, and
+published the reason: the formula wants a probability. That was an assertion with no control behind it,
+and the roadmap recorded three of wave 3's defaults as open — the calibration, the in-sample fit, and the
+rule keyed on the true label — predicting that each made the published saving an upper bound.
+
+`svclab.calibration` closes all three and the prediction survives only one of them.
+
+- `score.py` — the calendar split (`fit_period`), two calibrators fitted rather than assumed (`isotonic`
+  by pool-adjacent-violators, `platt` by Newton's method), the reliability table and its expected
+  calibration error, and the control: `true_probability`, the accuracy curve the generator actually uses.
+- `selection.py` — `price` and `swept` (wave 3's pricing, on any subset and any key), `resolve_benefit`
+  and `amended_threshold` (the closed form carrying the term wave 3's omits), `formula_table`,
+  `optimism_table` and `key_table`.
+- One parameter added elsewhere: `svclab.routing.defer_below` now takes a `key`, so a per-intent rule can
+  be keyed on `predicted_intent`. The default is the true intent, which is what wave 3 priced, so no
+  published figure moves. And `svclab.bot.classifier_labels` lifts the predicted label out of `run` so a
+  router can read it without running the bot — the outcome frames are asserted unchanged.
+
+**Result 1 — calibration is real and is not the missing step.** Raw calibration error 0.1618 against the
+control's 0.0061; in the bin where the score says 0.6502, 0.9078 of the labels are right. Calibrating
+cuts the formula's penalty 3.59 times, 17.04% to 4.74%. On the perfectly calibrated probability it is
+still 7.33%.
+
+**Result 2 — the missing piece is a term.** The closed form prices a wrong label and a deferral and
+treats a right label as free. Carrying the benefit, `(misroute − defer) / (misroute + benefit)`, the
+penalty falls to 1.96% on the raw margin — and 342.14 seconds there beats 367.54 from the naive formula on
+the probability the generator uses. Fixing the model beat fixing the input by roughly four to one.
+
+**Result 3 — the best-calibrated score is the worst ranker.** The control's swept cost is 342.4383 against
+the raw margin's 335.5655, because it is the only score that does not know what the classifier saw.
+
+**Result 4 — optimism is 1.5076 seconds per contact**, 0.45% of the bill and 13.05% of wave 3's saving,
+concentrated in the two smallest and dearest intents. The thresholds move much further than the cost
+does, so the cost was learned and the cut was not.
+
+**Result 5 — the deployable key wins.** 11.9210 seconds per contact saved keyed on the classifier's label
+against 10.9487 keyed on the truth, with 75 fewer misroutes.
+
+### Defects found and recorded
+
+1. **A published diagnosis that a control case refutes.** Wave 3 wrote "calibration is the missing step,
+   and the closed form assumes it silently" in the root READMEs, the routing module's docstring, its
+   package docstring and its README — four places, one unverified claim. The diagnosis is half right: the
+   input really is wrong, and fixing it leaves 7.33% of the penalty standing, because the formula also
+   omits the benefit of a correct label. What made it wrong was the missing control, not the missing
+   measurement: there was nothing in wave 3 on which the formula was expected to be *exactly* optimal, so
+   nothing could fail. All four statements are now corrected in place rather than deleted, and the
+   correction points here.
+2. **A prediction about the deployable rule that is backwards.** This file recorded that keying the rule
+   on the predicted label would leave the direction intact and shrink the size of the gain. It grows it,
+   from 10.9487 to 11.9210 seconds per contact, with 75 fewer misroutes. The reasoning behind the
+   prediction treated the reported label as a noisy proxy for the true one, when for *this* decision it is
+   the better conditioning variable: a wrong label is the event the cost is made of, so the reported
+   label carries information about the classifier being wrong and the true label carries none. The
+   corollary is recorded too — the three corrections do not all point the same way, and the two that
+   matter nearly cancel, so wave 3's headline survives for a reason wave 3 did not name.
+3. **A docstring describing a different function from the one that produced the figures.**
+   `svclab.routing.defer_below` documented its per-intent mapping as keyed on the "**predicted** intent",
+   noting that per intent is "the harder one to deploy, because the rule has to be keyed on what the
+   classifier thinks" — while the code mapped the true `intent` column. Every per-intent figure in wave 3
+   was therefore produced by the oracle rule and described as the deployable one. Nothing in wave 3 could
+   catch it: the two readings differ only where the classifier is wrong, and no test asked which of them
+   had run. Found by needing the deployable rule badly enough to go and read the code.
+
+One more thing was caught by its own test before publication and is recorded here only because the class
+of mistake is worth naming: the first isotonic fit ran pool-adjacent-violators over individual points
+rather than over pooled ties, so contacts sharing one score could be given different probabilities
+depending on the order they happened to be stored in. A unit test asserting the fitted value at a
+repeated score failed on the first run. It moved no published figure on this account, which is the part
+worth noticing — the account's scores are nearly all distinct, so the defect was invisible in every
+aggregate and visible only in a four-point example.
+
 ## The executive brief — `FINDINGS.md` *(complete)*
 
 Eight waves of findings were readable only in the order they were built, next to the arithmetic that
@@ -566,6 +640,18 @@ competent operation would have decided without it, and what to do instead.
 
 ## Still open
 
+- **A benefit conditioned on more than the intent.** Wave 9's amended threshold uses one benefit per
+  intent, averaged over contacts whose resolvability differs, which is why it lands within a fraction of
+  a per cent of the sweep instead of on it. A benefit conditioned on the score itself would close more of
+  that gap and needs its own held-out fit.
+- **A period that actually drifts.** Wave 9's calendar split measures pure fitting noise, because nothing
+  in this generator changes over the month. Distribution shift is the failure a held-out period is
+  usually defended as testing, and it is the one this repository cannot yet exhibit.
+- **A classifier whose confidence does not know the outcome.** The score here is built from the realised
+  classification, which makes it a better ranker than any deployed confidence and is the mechanism behind
+  wave 9's Result 3. A score built only from features the classifier could see would separate calibration
+  from discrimination on honest levels rather than on this account's optimistic ones.
+
 - **Attrition that depends on more than occupancy.** Wave 8's curve knows about how hard the work is
   and nothing else. Pay, management, commute, the labour market and the season all matter more in most
   operations, and a curve fitted to one operation's leavers is the first thing worth measuring before
@@ -607,16 +693,6 @@ competent operation would have decided without it, and what to do instead.
   a uniformly higher chance of being difficult again. Real escalations look like a heavy tail: mostly
   ordinary, occasionally catastrophic. A copula with tail dependence is the honest shape and it is a
   different parameter, not a different number.
-- **Calibrating the classifier score, so the closed-form threshold has the input it assumes.** Wave 3
-  shows the formula's ranking surviving and its levels failing on a margin. Isotonic or Platt scaling on
-  a held-out period is the missing step, and it is the difference between a threshold that is optimal and
-  one that is merely ordered correctly.
-- **Choosing the thresholds out of sample.** Wave 3 sweeps them on the same contacts it then prices
-  them on, so the saving quoted for the per-intent rule is an upper bound. A held-out period is the
-  honest version.
-- **Keying the routing rule on the predicted label rather than the true one.** A deployment cannot see
-  the true intent, and the rule has to fire on the classifier's guess. The direction survives; the size
-  of the gain would shrink.
 - **Correcting for the attenuation rather than measuring it.** Wave 2's factor is measurable, so
   dividing the observed difference by it is available and is deliberately not offered: a correction
   applied to a gauge study this uncertain buys a point estimate and loses the interval. Propagating the
