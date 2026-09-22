@@ -23,6 +23,11 @@ conferidas contra a verdade em vez de contra outra taxa de contenção. Nenhum d
 cliente, consumidor, fornecedor ou plataforma é usado em qualquer parte, e não existe modelo de
 linguagem no repositório — ver [`DISCLAIMER.md`](DISCLAIMER.md).
 
+**Se você decide em vez de verificar, leia [`docs/FINDINGS.pt-BR.md`](docs/FINDINGS.pt-BR.md).** Ele
+apresenta os mesmos oito achados como decisões — em que cada um desemboca, o que uma operação competente
+teria decidido sem ele, e o que fazer em vez disso — e não cita nenhuma cifra que este README não
+publique.
+
 ## O achado, numa tabela
 
 Quatro políticas de bot encontram os mesmos 31.802 contatos. Ranqueadas por contenção, melhor primeiro:
@@ -387,7 +392,7 @@ python examples/08_the_payroll_behind_the_plan.py
 
 ## Como as afirmações são mantidas honestas
 
-**371 testes, 100% de cobertura de linhas e de ramos.** 307 deles rodam em segundos e liberam cada push.
+**376 testes, 100% de cobertura de linhas e de ramos.** 312 deles rodam em segundos e liberam cada push.
 Os 64 restantes re-derivam, a partir do gerador, toda cifra citada em todo README deste repositório, e
 rodam o script de exemplo. Uma mudança que mova um número publicado quebra o build em vez de deixar o
 texto silenciosamente errado.

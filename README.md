@@ -23,6 +23,10 @@ checked against the truth instead of against another containment rate. No employ
 vendor or platform data is used anywhere, and there is no language model in the repository — see
 [`DISCLAIMER.md`](DISCLAIMER.md).
 
+**If you decide rather than verify, read [`docs/FINDINGS.md`](docs/FINDINGS.md) instead.** It states the
+same eight findings as decisions — what each one lands on, what a competent operation would have decided
+without it, and what to do instead — and quotes no figure this README does not publish.
+
 ## The finding, in one table
 
 Four bot policies meet the same 31,802 contacts. Ranked by containment, best first:
@@ -386,7 +390,7 @@ python examples/08_the_payroll_behind_the_plan.py
 
 ## How the claims are kept honest
 
-**371 tests, 100% statement and branch coverage.** 307 of them run in seconds and gate every push. The
+**376 tests, 100% statement and branch coverage.** 312 of them run in seconds and gate every push. The
 remaining 64 re-derive, from the generator, every figure quoted in every README on this repository,
 and run the example script. A change that moves a published number breaks the build instead of leaving
 the text quietly wrong.

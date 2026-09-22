@@ -520,6 +520,30 @@ trying not to do, and noticing that three times is what made it worth writing do
    the boundary it is - the occupancy-attrition problem is a large-queue problem, the same boundary
    wave 7 found for its binding ceiling.
 
+## The executive brief — `FINDINGS.md` *(complete)*
+
+Eight waves of findings were readable only in the order they were built, next to the arithmetic that
+produced them. The reader who has to *decide* needs the other cut: what each finding lands on, what a
+competent operation would have decided without it, and what to do instead.
+
+- [`FINDINGS.md`](FINDINGS.md) and [`FINDINGS.pt-BR.md`](FINDINGS.pt-BR.md) — one numbered finding per
+  example, each in four movements (the decision, what the case said, what the account says, what to do
+  instead), plus a closing section on what none of it says.
+- **It derives nothing**, which is the risk: a second copy of a figure is a second place for it to go
+  stale, and the claim tests cannot see a file they do not parse. So the coupling is asserted instead.
+  `tests/test_findings_meta.py` extracts every quantity from the brief — decimals, percentages and
+  counts of a hundred or more — and fails unless each one appears in the root README of the same
+  language, which the slow suite re-derives from the generator. A third test compares the two editions
+  to each other after normalising the decimal separator, because a figure corrected in one language and
+  not the other is the defect this repository keeps making.
+- The coupling test earned itself immediately: the first draft advised measuring the reopen rate and
+  said a tail model is not worth building "below roughly 0.1". That threshold was **invented in the act
+  of writing the sentence** — no test derives it, and nothing in the repository supports it. The build
+  refused the figure before the commit existed. It was replaced by the two anchors wave 6 actually
+  publishes: one return captures this queue to within 0.18%, and at a reopen rate of 0.5 it misses a
+  third. The lesson generalises past this file — **prose is where unverified numbers enter a repository
+  whose code is fully tested**, because prose is the only part nobody compiles.
+
 ## What is deliberately not here
 
 - **No language model, and no API call to one.** The bot is a policy plus a declared response curve.
